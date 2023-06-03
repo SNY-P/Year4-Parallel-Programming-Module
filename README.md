@@ -19,3 +19,6 @@ The work done between Weeks 5 - 7 are done in MPJ Express, find the related code
 The [Week 8](/Resource%20Files/Lab%20Worksheets/week8-lab.html) lab worksheet is related to the mini-project that would be undertaken.
 The [Week 9](/Resource%20Files/Lab%20Worksheets/week9-lab.html) lab worksheet is an additional lab worksheet that was optional to do.
 
+## Mini-Project
+The [mini-project](/Mini-Project/) that was undertaken for the second half of the coursework was the RayTracer project that was given as an option from the week 8 lab worksheet.
+
