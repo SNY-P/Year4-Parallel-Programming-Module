@@ -1,0 +1,381 @@
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<link href="./week1-lab_files/mystyle.css" rel="stylesheet" type="text/css">
+</head>
+
+<body style="" data-new-gr-c-s-check-loaded="14.1111.0" data-gr-ext-installed="">
+
+<div id="container">
+
+<div id="header">
+<h1>Parallel Programming Lab, Week 1:<br>Java Threads for Parallelism - Reprise</h1>
+
+</div>
+
+<div id="content">
+
+<p>
+In this first week we haven't covered enough material in the
+lectures to do much <i>new</i> work on parallel programming.
+But many of you will have some experience of multi-threaded programming
+in Java from the second year module on operating systems and 
+architectures (COSINE).  For those of you who <i>did</i> attend COSINE, this
+week's lab will be a refresher on using Java threads to speed up
+a simple calculation through parallelism.  For any of you who <i>did
+not</i>, hopefully this will act as a primer.
+</p>
+
+<p>
+In fact the lab script here is only slightly adapted from the final
+lab script in the first term of COSINE, so some of you have already seen
+this material.  But it will become much more relevant in the context of the
+current module; please go through it and make sure you attempt the
+exercises at the end.</p>
+
+<p>
+I am going to assume you know how to compile and run Java
+programs on the computers in the lab.  Talk to me if you do <i>not</i>.
+A popular option for this is likely to
+be NetBeans, available through AppsAnywhere under Windows.  Other
+plausible possiblities include the Oracle Java Development Kit (JDK) or
+Eclipse.  Unfortunately neither of the latter are currently available
+on the Windows build of the lab machines, but I expect many of you will
+be using your home computers this year.</p>
+<!--
+on the Windows boot of the lab machines, though JDK is available under
+the CentOS boot - well worth considering if you are comfortable with
+Linux!</p>
+-->
+
+<!--
+
+If you need a reminder, <a
+href="2nd-year-java-reprise.html">this extract from the second year
+labs</a> may help.</p>
+
+-->
+
+
+<h2>Calculating <i>π</i></h2>
+
+<p>
+There are many ways to approximately calculate the mathematical constant
+<i>π</i>.  One "brute force" method is based on the following formula from
+calculus:
+</p>
+<p>
+<img src="./week1-lab_files/pi-integral.png" height="70">
+</p>
+<p>
+Using the
+<a href="http://en.wikipedia.org/wiki/Numerical_integration"><i>rectangle
+rule</i></a> for numerical integration, this can be approximated by breaking
+up the <i>x</i> range into steps:</p>
+<p>
+<img src="./week1-lab_files/pi-sum.png" height="120">
+</p>
+<p>
+where <i>N</i> is the number of steps, and:</p>
+<p>
+<img src="./week1-lab_files/h-definition.png" height="35">
+</p>
+<p>
+is the size of a single step.</p>
+
+<p>
+Using JDK or NetBeans, create a Java program or project to calculate the sum
+numerically.  Your main class may look like this:
+</p><pre>  public class SequentialPi {
+
+      public static void main(String[] args) {
+
+          int numSteps = 10000000;
+
+          double step = 1.0 / (double) numSteps;
+
+          double sum = 0.0;
+
+          for(int i = 0 ; i &lt; numSteps ; i++){
+              double x = (i + 0.5) * step ;
+              sum += 4.0 / (1.0 + x * x);
+          }
+
+          double pi = step * sum ;
+
+          System.out.println("Value of pi: " + pi);
+      }
+
+  }
+</pre>
+Here the constant <i>N</i> is represented by the value of the variable
+<tt>numSteps</tt>.  We have set it to 10 million, which is enough to
+get a pretty accurate estimate of <i>π</i>.<p></p>
+
+<p>
+In Java, <tt>double</tt> is one of the standard types for representing
+a floating point number.</p>
+
+<p>
+Run this program and record the result.  Compare it with known
+estimates of <i>π</i> - look <a href="http://en.wikipedia.org/wiki/Pi#Approximate_value">here</a>,
+for example.</p>
+
+
+<h2>A Parallel Program</h2>
+
+<p>
+Our formula for calculating <i>π</i> is simply a large sum of independent
+terms.  
+<!--Problems like this are sometimes called <i>embarassingly
+parallel</i>.  What this means is that they are <i>really</i> easy
+to break down into sub-tasks that can be run in parallel.  (Some people
+are just embarassed when problems are too simple - most of the time
+parallelising code is harder.)
+-->
+In this case we can break the sum into two halves (say) and
+do two sums in separate threads.  Then at the end we just have to add together
+the two numbers that emerge.</p>
+
+<p>
+Here is a program that does that:
+</p><pre>  public class ParallelPi extends Thread {
+
+      public static void main(String[] args) throws Exception {
+
+          ParallelPi thread1 = new ParallelPi();
+          thread1.begin = 0 ;
+          thread1.end = numSteps / 2 ;
+
+          ParallelPi thread2 = new ParallelPi();
+          thread2.begin = numSteps / 2 ;
+          thread2.end = numSteps ;
+
+          thread1.start();
+          thread2.start();
+        
+          thread1.join();
+          thread2.join();
+
+          double pi = step * (thread1.sum + thread2.sum) ;
+        
+          System.out.println("Value of pi: " + pi);
+      }
+
+      static int numSteps = 10000000;
+    
+      static double step = 1.0 / (double) numSteps;
+
+      double sum ;  
+      int begin, end ;
+
+      public void run() {
+
+          sum = 0.0 ;
+
+          for(int i = begin ; i &lt; end ; i++){
+              double x = (i + 0.5) * step ;
+              sum += 4.0 / (1.0 + x * x);
+          }
+      }
+  }
+</pre>
+Remember that in Java a <i>thread</i> is implemented by creating an instance
+of a class that extends the <tt>Thread</tt> class.  Any such class will
+have to have a <tt>run()</tt> method which contains the work that is
+executed in the thread.  A parent program (our <tt>main()</tt> method)
+spawns a thread by
+executing the <tt>start()</tt> method on a thread object.<p></p>
+
+<p>
+A thread finishes when its <tt>run()</tt> method completes.
+The parent program can - as here - wait until spawned threads finish
+by executing the join method on the thread object.</p>
+
+<p>
+The main calculation is done in the <tt>run()</tt> method of the threads.
+You'll notice this is very similar to the main loop of the sequential
+program, except that the loop goes from some <tt>begin</tt> value to
+some <tt>end</tt> value.  These values are set in fields of the thread
+objects, created by the main program.  We have two thread objects
+and the first one does the sum from 0 up to <tt>numSteps/2</tt>,
+and the second object does the sum from <tt>numSteps/2</tt> up to
+<tt>numSteps</tt>.</p>
+
+<p>
+In the interests of simplicitly, I have eschewed good
+object-oriented pratices - so the main program directly accesses
+instance variables of objects it creates (<tt>begin</tt>, <tt>end</tt>,
+<tt>sum</tt>, etc).  If this offends your sensibilities, feel free to
+rewrite the code in a more OO fashion!</p>
+
+<p></p>
+Although the strategy really is straightforward, you'll notice the program
+suddenly got much longer.  This is fairly typical of parallel programs.
+As this course develops you will meet various other programming
+paradigms that try to make parallel programming easier.<p></p>
+
+<p>
+The total number of steps is the same as for the sequential program, but
+this time we have defined this value in a static variable, so it can easily
+be shared by two threads.</p>
+
+<p>
+Run this program.  The exact result for <i>π</i> will be slightly different
+to the result from the sequential program, because the additions in
+the sum are performed in a different order, and rounding errors will
+accumulate slightly differently.  But the accuracy of the result should
+be similar.
+</p>
+
+<h2>Benchmarking</h2>
+
+<p>
+There isn't much point doing parallel programming if it doesn't make
+our programs go faster.  We need to time the runs for the sequential
+and parallel versions of our program, and compare how long each takes.
+</p>
+
+<p>
+We will use the method <tt>System.currentTimeMillis()</tt> to get the
+current time.  The time is represented in a interesting way -
+as the number of milliseconds that have elapsed from midnight,
+January 1, 1970.  The base date - the beginning of 1970 - is sometimes called
+<a href="http://en.wikipedia.org/wiki/Unix_time"><i>UNIX Epoch</i></a>.
+Roughly speaking, it is when the UNIX operating system was invented.
+This is an important date for Java and other languages influenced by
+UNIX.</p>
+
+<p>
+For our benchmarks we only care about the difference between two times -
+the time when the computation starts and the time when it ends.  Using
+<tt>currentTimeMillis()</tt> and taking a difference will naturally give us the
+time for the computation in milliseconds.</p>
+
+<p>
+Change the main method of the <tt>SequentialPi</tt> to look like this:
+</p><pre>      public static void main(String[] args) {
+
+          long startTime = System.currentTimeMillis();
+
+          int numSteps = 10000000;
+
+          double step = 1.0 / (double) numSteps;
+
+          double sum = 0.0;
+
+          for(int i = 0 ; i &lt; numSteps ; i++){
+              double x = (i + 0.5) * step ;
+              sum += 4.0 / (1.0 + x * x);
+          }
+
+          double pi = step * sum ;
+
+          long endTime = System.currentTimeMillis();
+
+          System.out.println("Value of pi: " + pi);
+
+          System.out.println("Calculated in " +
+                             (endTime - startTime) + " milliseconds");
+    }
+</pre>
+<p></p>
+
+<p>
+Run the new version, and record the time taken.</p>
+
+<p>
+Similarly, change the main method of <tt>ParallelPi</tt> to look like this:
+</p><pre>      public static void main(String[] args) throws Exception {
+
+          long startTime = System.currentTimeMillis();
+
+          ParallelPi thread1 = new ParallelPi();
+          thread1.begin = 0 ;
+          thread1.end = numSteps / 2 ;
+
+          ParallelPi thread2 = new ParallelPi();
+          thread2.begin = numSteps / 2 ;
+          thread2.end = numSteps ;
+
+          thread1.start();
+          thread2.start();
+        
+          thread1.join();
+          thread2.join();
+
+          long endTime = System.currentTimeMillis();
+
+          double pi = step * (thread1.sum + thread2.sum) ;
+        
+          System.out.println("Value of pi: " + pi);
+
+          System.out.println("Calculated in " +
+                             (endTime - startTime) + " milliseconds");
+      }
+</pre>
+and record the time this version takes to run.
+<p></p>
+
+<p>
+The ratio of the time for the sequential run to time for the parallel run
+is called the <i>parallel speedup</i>:</p>
+<p>
+<img src="./week1-lab_files/speedup-definition.png" height="60">
+</p>
+<p>
+Calculate the parallel speedup for your runs.  Is it 2?  Explain.
+</p>
+
+<p>
+Reduce <tt>numSteps</tt> to 1000000 (1 million), run both programs
+again and calculate the new parallel speedup.  Increase <tt>numSteps</tt>
+to 1000000000 (1 billion).  Calculate the parallel speedup again.
+Explain your results.</p>
+
+<h2>Exercises</h2>
+
+<ol>
+<li>
+<p>
+Make a "quad-core" version of <tt>ParallelPi</tt> that divides the
+range of the sum into four equal parts, and uses four threads.
+Does this version go faster than the two-threaded version?
+How many cores does your machine have?
+</p><p>
+(If you finish that, you may try to increase the number of threads further to exploit hyperthreading - ask me if you don't know what this means!)
+</p></li>
+<li>
+<p>
+Try using <tt>System.nanoTime()</tt> in place of
+<tt>System.currentTimeMillis()</tt> for timing.  Does this give more
+accurate results?
+</p></li></ol>
+
+</div>
+
+<div id="footer">
+Copyright © University of Portsmouth, 2020
+</div>
+
+
+
+</div></body><grammarly-desktop-integration data-grammarly-shadow-root="true"><template shadowrootmode="open"><style>
+  div.grammarly-desktop-integration {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+    -moz-user-select: none;
+    -webkit-user-select: none;
+    -ms-user-select:none;
+    user-select:none;
+  }
+
+  div.grammarly-desktop-integration:before {
+    content: attr(data-content);
+  }
+</style><div aria-label="grammarly-integration" role="group" tabindex="-1" class="grammarly-desktop-integration" data-content="{&quot;mode&quot;:&quot;full&quot;,&quot;isActive&quot;:true,&quot;isUserDisabled&quot;:false}"></div></template></grammarly-desktop-integration></html>

@@ -1,0 +1,222 @@
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<link href="./week9-lab_files/mystyle.css" rel="stylesheet" type="text/css">
+</head>
+
+<body style="" data-new-gr-c-s-check-loaded="14.1111.0" data-gr-ext-installed="">
+
+<div id="container">
+
+<div id="header">
+<h1>Parallel Programming Lab, Week 9:<br>Aparapi, briefly</h1>
+
+</div>
+
+<div id="content">
+
+<p>
+This is not a full length lab practical, but should give
+you basic experience in using Aparapi for GPU programming - perhaps
+it may tempt you to use this interface for your development project.
+</p>
+
+<p>
+The example given here is the matrix multiplication problem that we
+have used in the lectures.</p>
+
+<p>
+First, try running this pretty naive sequential matrix multiplication
+code on the CPU:
+</p><pre>public class Matmul {
+
+    public static final int N = 1024 ;
+
+    public static void main(String [] args) {
+
+        float [] a = new float [N * N], b = new float [N * N] ;
+        float [] c = new float [N * N] ;
+
+        for (int i = 0 ; i &lt; N ; i++) {
+            for(int j = 0 ; j &lt; N ; j++) {
+                a [N * i + j] = i + j ;
+                b [N * i + j] = i - j ;
+            }
+        }
+
+        long startTime = System.currentTimeMillis() ;
+       
+        for(int i = 0 ; i &lt; N; i++) {
+            for(int j = 0 ; j &lt; N ; j++) {
+                float sum = 0 ;
+                for(int k = 0 ; k &lt; N ; k++) {
+                    sum += a [N * i + k] * b [N * k + j] ;
+                }
+                c [N * i + j] = sum ;
+            }
+        }
+       
+        long endTime = System.currentTimeMillis() ;
+       
+        long timeMs = endTime - startTime ;
+       
+        System.out.println("Sequential matrix multiplication completed in "
+                + timeMs + " milliseconds") ;
+        System.out.println("Sequential performance = " +
+                ((2L * N * N * N) / (1E6 * timeMs)) + " GFLOPS") ;
+    }
+}
+</pre>
+This will probably report a fairly respectable performance between about
+1 and 2 GFLOPS on the lab computers.<p></p>
+
+<p>
+When we come to run this problem on the GPU, we will push to larger <tt>N</tt>
+values.  In the above code, try increasing the value of this variable to
+2048.  You may, like me, observe a precipate drop in performance.</p><p>
+
+</p><p>
+This performance cliff is probably associated with the data structures
+getting too large to comfortably fit in cache memory.  Replace the
+the central loop nest that calculates <tt>c</tt> with this code:
+</p><pre>        float [] bt = new float [N * N] ;
+     
+        for(int i = 0 ; i &lt; N; i++)
+            for(int j = 0 ; j &lt; N ; j++)
+                bt [N * i + j] = b [N * j + i] ;
+
+        for(int i = 0 ; i &lt; N; i++) {
+            for(int j = 0 ; j &lt; N ; j++) {
+                float sum = 0 ;
+                for(int k = 0 ; k &lt; N ; k++) {
+                    sum += a [N * i + k] * bt [N * j + k] ;
+                }
+                c [N * i + j] = sum ;
+            }
+        }
+</pre>
+Here we have simply introduced a temporary array <tt>bt</tt> that is initialized
+with the <i>transpose</i> of matrix <tt>b</tt>, and used this in the main
+loop (with <tt>bt</tt> indices swapped round in the inner loop so we get
+exactly the same result for <tt>c</tt>).  Run this again with <tt>N</tt>
+= 2048.  You may see a startling improvement in performance - a salutary
+lesson in the essential role of cache in performance of modern CPUs.<p></p>
+
+<p>
+Moving on to Aparapi, create a new project in Netbeans, but this time
+select the <i>Maven</i> top level category, rather than just <i>Java</i>.
+The project type will still be <i>Java Application</i>.</p>
+
+<p>
+Give the project a name like <tt>aparapiMatmul</tt>.  You can change the
+Group Id from its default if you wish (if, for example, you have a favourite
+domain of your own).</p>
+
+<p>
+Right click on the project folder called just <tt>Dependencies</tt>,
+select "Add Dependency...".  The dependency we are going to add is
+Aparapi.</p>
+
+<p>
+Set "Group ID" to <tt>com.aparapi</tt>, "Artifact ID" to <tt>aparapi</tt> and
+"Version" to 1.8.0, or whatever is currently documented at:
+</p><pre>  <a href="http://aparapi.com/introduction/getting-started.html">http://aparapi.com/introduction/getting-started.html</a>
+</pre>
+and leave other fields unchanged.  Click "Add".<p></p>
+
+<p>
+Right click on the project directory under "Source Packages", and add a new
+Java Class, which I will call "AparapiMatmul".  The code under the
+package declaration can look like this:
+</p><pre>import com.aparapi.Kernel;
+import com.aparapi.ProfileInfo;
+import com.aparapi.Range;
+import com.aparapi.device.Device ;
+
+public class AparapiMatmul {
+
+    public static final int N = 2048 ; 
+
+    public static void main(String [] args) {
+
+        float [] a = new float [N * N], b = new float [N * N] ;
+        float [] c = new float [N * N] ;
+
+        for (int i = 0 ; i &lt; N ; i++) {
+            for(int j = 0 ; j &lt; N ; j++) {
+                a [N * i + j] = i + j ;
+                b [N * i + j] = i - j ;
+            }
+        }
+
+        Kernel kernel = new Kernel() {
+            public void run() {
+                int tx = getGlobalId(0) ;
+                int ty = getGlobalId(1) ;
+
+                float sum = 0 ;
+                for(int k = 0 ; k &lt; N ; k++) {
+                    sum += a [N * ty + k] * b [N * k + tx] ;
+                }
+                c [N * ty + tx] = sum ;
+            }
+        } ;
+
+        long startTime = System.currentTimeMillis() ;
+
+        Device device = Device.best() ;
+       
+        Range range = device.createRange2D(N, N) ;
+        kernel.execute(range) ;
+
+        long endTime = System.currentTimeMillis() ;
+
+        System.out.println("Device type = " +
+                           device.getType());
+
+        long timeMs = endTime - startTime ;
+        System.out.println("Matrix multiplication completed in "
+                + timeMs + " milliseconds") ;
+        System.out.println("Performance = " +
+                ((2L * N * N * N) / (1E6 * timeMs)) + " GFLOPS") ;
+    }
+}
+</pre>
+Run this project as usual.  Increase <tt>N</tt>, e.g. to 4096 and run
+again.  Performance should increase with increasing problem size, and
+eventually eclipse CPU performance by one to two orders of magnitude.<p></p>
+
+<p>
+For more documentation on using Aparapi, see:
+</p><pre>  <a href="http://aparapi.com/">http://aparapi.com/</a>
+</pre>
+<p></p>
+
+</div>
+
+<div id="footer">
+Copyright © University of Portsmouth, 2019
+</div>
+
+
+
+
+</div></body><grammarly-desktop-integration data-grammarly-shadow-root="true"><template shadowrootmode="open"><style>
+  div.grammarly-desktop-integration {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+    -moz-user-select: none;
+    -webkit-user-select: none;
+    -ms-user-select:none;
+    user-select:none;
+  }
+
+  div.grammarly-desktop-integration:before {
+    content: attr(data-content);
+  }
+</style><div aria-label="grammarly-integration" role="group" tabindex="-1" class="grammarly-desktop-integration" data-content="{&quot;mode&quot;:&quot;full&quot;,&quot;isActive&quot;:true,&quot;isUserDisabled&quot;:false}"></div></template></grammarly-desktop-integration></html>

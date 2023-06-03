@@ -1,0 +1,494 @@
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<link href="./week2-lab_files/mystyle.css" rel="stylesheet" type="text/css">
+</head>
+
+<body style="" data-new-gr-c-s-check-loaded="14.1111.0" data-gr-ext-installed="">
+
+<div id="container">
+
+<div id="header">
+<h1>Parallel Programming Lab, Week 2:<br>More Parallel Programming - Threads and Data</h1>
+
+</div>
+
+<div id="content">
+
+<p>
+In last week's introductory lab you wrote parallel programs to calculate
+a single number - the mathematical constant <i>π</i>.
+As we go through this unit we will see that parallel processing is more often
+useful in processing or generating larger volumes of data.
+</p>
+
+<p>The main exercise suggested in this lab script is to speed up the
+execution of a calculation of the <i>Mandelbrot Set</i>, using multiple
+threads running on a multicore processor.</p>
+
+<h2>Calculating the Mandelbrot Set</h2>
+
+<p>
+In case you are <i>not</i> familiar with the Mandelbrot set, please
+look it up on
+<a href="http://en.wikipedia.org/wiki/Mandelbrot_set">Wikipedia</a>.
+Then run the following (single-threaded) program for calculating the set:
+</p><pre>  import java.awt.Color ;
+  import java.awt.image.BufferedImage ;
+
+  import javax.imageio.ImageIO;
+
+  import java.io.File ;
+
+  public class Mandelbrot {
+
+      final static int N = 4096 ;
+      final static int CUTOFF = 100 ; 
+
+      static int [] [] set = new int [N] [N] ;
+
+      public static void main(String [] args) throws Exception {
+
+          // Calculate set
+
+          long startTime = System.currentTimeMillis();
+
+          <span style="color:red">// main calculation loop</span>
+ 
+          for(int i = 0 ; i &lt; N ; i++) {
+              for(int j = 0 ; j &lt; N ; j++) {
+
+                  double cr = (4.0 * i - 2 * N) / N ;
+                  double ci = (4.0 * j - 2 * N) / N ;
+
+                  double zr = cr, zi = ci ;
+
+                  int k = 0 ;
+                  while (k &lt; CUTOFF &amp;&amp; zr * zr + zi * zi &lt; 4.0) {
+
+                      // z = c + z * z
+
+                      double newr = cr + zr * zr - zi * zi ;
+                      double newi = ci + 2 * zr * zi ;
+
+                      zr = newr ;
+                      zi = newi ;
+
+                      k++ ;
+                  }
+
+                  set [i] [j] = k ;
+              }
+          }
+
+          long endTime = System.currentTimeMillis();
+
+          System.out.println("Calculation completed in " +
+                             (endTime - startTime) + " milliseconds");
+
+          // Plot image
+
+          BufferedImage img = new BufferedImage(N, N,
+                                                BufferedImage.TYPE_INT_ARGB) ;
+
+          // Draw pixels
+
+          for (int i = 0 ; i &lt; N ; i++) {
+              for (int j = 0 ; j &lt; N ; j++) {
+
+                  int k = set [i] [j] ;
+
+                  float level ;
+                  if(k &lt; CUTOFF) {
+                      level = (float) k / CUTOFF ;
+                  }
+                  else {
+                      level = 0 ;
+                  }
+                  Color c = new Color(level/2, level/2, level) ;  // Blueish
+                  img.setRGB(i, j, c.getRGB()) ;
+              }
+          }
+
+          // Print file
+
+          ImageIO.write(img, "PNG", new File("Mandelbrot.png"));
+      }
+  }
+</pre>
+Copy and paste the code above into a file called <tt>Mandelbrot.java</tt>,
+and compile and run it.  I don't particularly recommend you spend time typing
+the code by hand, but do make sure you know in general what is going on
+here.<p></p>
+
+<p>
+You don't need to worry unduly about the detailed mathematics inside
+the main calculation loops (first nest of for loops over <tt>i</tt>
+and <tt>j</tt>).
+But it should be evident that we are calculating values that go into the
+<tt>N</tt> by <tt>N</tt> array <tt>set</tt>.  Actually each element of
+<tt>set</tt> saves the number of iterations executed by the innermost while
+loop.  (<tt>set</tt> is a <i>two-dimensional array</i> - see for example
+<a href="http://www.processing.org/tutorials/2darray/">this tutorial</a>
+if you need a reminder on how these work.)</p>
+
+<p>
+The second half of the program just creates a graphical display of
+<tt>set</tt> in the file <tt>Mandelbrot.png</tt>, which you should be
+able to view using normal Windows programs (make sure you do so - if only
+to confirm that the program ran correctly).  Again, there is no need to
+worry about the details, although you might like to play with the color
+scheme!  In my scheme pixels within the set - for which the set element
+has value <tt>CUTOFF</tt> - are printed black.  This much is pretty
+conventional, I think.
+</p>
+
+<p>
+Run the program and make sure you find and view the output file.
+The file will be written in the current
+working directory, which for NetBeans is likely to be the NetBeans
+project directory for this program.
+</p>
+
+<p>
+Run the program a few times and record execution times.  When you come
+calculalate parallel speedup, though, take the <i>best</i> (i.e. fastest)
+timing you get.
+</p>
+
+<h2>Parallelizing the Mandelbrot Set</h2>
+
+<p>
+The strategy to parallelize this computation will be to run two or
+more threads, each calculating one part of the main <tt>i</tt>, <tt>j</tt>
+computation loop.</p>
+
+<p>
+For two threads, the overall shape of your solution may look something
+like this:
+</p><pre>  import java.awt.Color ;
+  import java.awt.image.BufferedImage ;
+  
+  import javax.imageio.ImageIO;
+  
+  import java.io.File ;
+  
+  public class ParallelMandelbrot extends Thread {
+  
+      final static int N = 4096 ;
+      final static int CUTOFF = 100 ; 
+  
+      static int [] [] set = new int [N] [N] ;
+  
+      public static void main(String [] args) throws Exception {
+  
+          // Calculate set
+  
+          long startTime = System.currentTimeMillis();
+  
+          ParallelMandelbrot thread0 = new ParallelMandelbrot(0) ;
+          ParallelMandelbrot thread1 = new ParallelMandelbrot(1) ;
+  
+          thread0.start() ;
+          thread1.start() ;
+  
+          thread0.join() ;
+          thread1.join() ;
+  
+          long endTime = System.currentTimeMillis();
+  
+          System.out.println("Calculation completed in " +
+                             (endTime - startTime) + " milliseconds");
+  
+          // Plot image
+  
+          BufferedImage img = new BufferedImage(N, N,
+                                                BufferedImage.TYPE_INT_ARGB) ;
+  
+          // Draw pixels
+  
+          for (int i = 0 ; i &lt; N ; i++) {
+              for (int j = 0 ; j &lt; N ; j++) {
+  
+                  int k = set [i] [j] ;
+  
+                  float level ;
+                  if(k &lt; CUTOFF) {
+                      level = (float) k / CUTOFF ;
+                  }
+                  else {
+                      level = 0 ;
+                  }
+                  Color c = new Color(0, level, 0) ;  // Green
+                  img.setRGB(i, j, c.getRGB()) ;
+              }
+          }
+      
+  
+          // Print file
+  
+          ImageIO.write(img, "PNG", new File("Mandelbrot.png"));
+      }
+  
+      int me ;
+  
+      public ParallelMandelbrot(int me) {
+          this.me = me ;
+      }
+  
+      public void run() {
+  
+          <span style="color:red"><i>[... You fill in this code! ...]</i></span>
+      }
+  
+  }
+</pre>
+I have left the body of the <tt>run</tt> method, where the elements of
+<tt>set</tt> are computed, for you to complete.<p></p>
+
+<p>
+Hints: the body of the <tt>run</tt> method may start something like this:
+</p><pre>          int begin, end ;
+
+          if (me == 0) {
+              begin = 0 ;
+              end = N/2 ;
+          }
+          else {  // me == 1
+              begin = N/2 ;
+              end = N ;
+          }
+</pre>
+followed by a loop over <tt>i</tt> and <tt>j</tt> almost identical to
+the main calculation loop in the sequential version above, except that
+the limits of the <tt>i</tt> loop are controlled by the variables
+<tt>begin</tt> and <tt>end</tt>.<p></p>
+
+<p>
+If you compare this with the approach taken in our
+parallel <i>π</i> calculation from last week, you will notice
+how each thread is now just given an integer identity, <tt>me</tt>,
+and it uses this identity to decide itself which subrange of the loop
+to handle.  This is a very common approach in many parallel programming
+environments.</p>
+
+<p>
+Save your program in a file called <tt>ParallelMandelbrot.java</tt>,
+compile and run it, and check it produces recognizable output.
+</p>
+
+<p>
+Again, run the program several times and record the <i>best</i> timing.
+</p>
+
+<h2>Exercises</h2>
+
+<ol>
+<li>
+What parallel speed-up do you get from using two threads, dividing
+up the horizontal <tt>i</tt> range, as outlined above?  See last week's
+lab script for a definition of parallel speed-up.
+</li>
+<li>
+Try dividing up the vertical <tt>j</tt> range instead.
+Do you get the same or
+different parallel speed-up?  Why? (Hint: consider the shape of the
+Mandelbrot set.)
+</li>
+<li>
+Now make parallel Mandelbrot programs that works in <i>four</i>
+threads, by:
+<ol>
+<li>
+dividing up either the <tt>i</tt> or <tt>j</tt> range into four parts, and by
+</li><li>
+dividing the image into four squares (i.e. divide <tt>i</tt> and <tt>j</tt> ranges both into two parts).
+</li>
+</ol>
+Record all timings and speed-ups and interpret them.
+</li>
+</ol>
+
+<!-- can you relate the speedup with four squares to earlier speedups you have seen (should be two thread i speedup * j speedup) -->
+
+</div>
+
+<div id="footer">
+Copyright © University of Portsmouth, 2020
+</div>
+
+
+
+
+</div><div id="naptha_container0932014_0707"></div></body><grammarly-desktop-integration data-grammarly-shadow-root="true"><template shadowrootmode="open"><style>
+  div.grammarly-desktop-integration {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+    -moz-user-select: none;
+    -webkit-user-select: none;
+    -ms-user-select:none;
+    user-select:none;
+  }
+
+  div.grammarly-desktop-integration:before {
+    content: attr(data-content);
+  }
+</style><div aria-label="grammarly-integration" role="group" tabindex="-1" class="grammarly-desktop-integration" data-content="{&quot;mode&quot;:&quot;full&quot;,&quot;isActive&quot;:true,&quot;isUserDisabled&quot;:false}"></div></template></grammarly-desktop-integration><span style="--colorFg:#dae1ec; --colorFgFadedMore:#c3c9d3; --colorBg:#080a16; --colorBgDark:#000010; --colorBgLighter:#1d1f28; --colorBorder:#30323c;"><template shadowrootmode="closed"><style>
+:host {
+  position: absolute;
+  top: 0px;
+  left: 0px;
+  width: 0;
+}
+.vivaldi-translate-text-container {
+  display: block;
+  position: relative;
+  font-family: 'Roboto',arial,sans-serif;
+  font-size: 14px;
+  min-height: 150px;
+  min-width: 250px;
+  max-width: 1000px;
+  background-color: var(--colorBgLighter);
+  color: var(--colorFg);
+  box-shadow: 0px 0px 5px 2px rgba(0, 0, 0, 0.2);
+  border-width: 1px;
+  border-style: solid;
+  border-image: initial;
+  border-color: rgb(187, 187, 187) rgb(187, 187, 187) rgb(168, 168, 168);
+  border-radius: 6px;
+  margin: 0;
+  padding: 0;
+  z-index: 2147483647;
+}
+.vivaldi-translate-text-container.initial {
+  display: none;
+  height: 0;
+}
+.vivaldi-translate-text-close {
+  position: relative;
+  cursor: pointer;
+  background-color: var(--colorBgLighter);
+  border: 0;
+  left: calc(100% - 20px);
+  top: 5px;
+  margin: 0;
+  padding: 0;
+  width: 16px;
+  height: 16px;
+}
+.vivaldi-translate-text-close > svg {
+  fill: var(--colorFg);
+}
+.vivaldi-translate-text-close:hover {
+  background-color: var(--colorBg);
+}
+.vivaldi-translate-text,
+.vivaldi-translate-text-result {
+  position: relative;
+  cursor: text;
+  -webkit-appearance: none;
+  top: 0px;
+  left: 0px;
+  overflow-y: auto;
+  margin-right: 10px;
+  margin-bottom: 16px;
+  padding: 6px;
+  border-width: 0px;
+  height: 100%;
+  transition: opacity 0.3s;
+  outline: unset;
+  color: var(--colorFgFadedMore);
+}
+.vivaldi-translate-text-result {
+  color: var(--colorFg);
+}
+.vivaldi-translate-text-result-container {
+  margin: 0;
+  padding: 0;
+  padding-top: 12px;
+  background-color: var(--colorBg);
+  border-width: 1px 0 1px 0;
+  border-style: solid;
+  border-image: initial;
+  border-color: var(--colorBorder);
+}
+.vivaldi-translate-select-languages {
+  width: 200px;
+  font-family: 'Roboto',arial,sans-serif;
+  font-size: 12px;
+  margin-left: 6px;
+  background-color: var(--colorBgLighter);
+  color: var(--colorFg);
+}
+.vivaldi-translate-src-language,
+.vivaldi-translate-dest-language {
+  padding-left: 6px;
+  font-weight: 600;
+  font-size: 10px;
+}
+.vivaldi-translate-language {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+.vivaldi-translate-timing {
+  font-size: 8px;
+  text-align: right;
+  margin-right: 6px;
+  margin-bottom: 6px;
+  padding: 0 6px;
+}
+.vivaldi-translate-footer {
+  font-size: 10px;
+  padding: 4px;
+  background-color: var(--colorBgDark);
+  margin: 0;
+  border-bottom-right-radius: 6px;
+  border-bottom-left-radius: 6px;
+}
+.vivaldi-translate-button-container {
+  display: block;
+  position: relative;
+  cursor: pointer;
+  overflow: hidden;
+  box-shadow: 0px 0px 5px 2px rgba(0, 0, 0, 0.2);
+  border-radius: 2px;
+  z-index: 2147483647;
+  width: 32px;
+  height: 32px;
+}
+.vivaldi-translate-button-container.initial {
+  display: none;
+  height: 0;
+}
+.vivaldi-translate-button {
+  position: relative;
+  -webkit-appearance: none;
+  background-color: var(--colorBg);
+  top: 0px;
+  left: 0px;
+  width: 32px;
+  height: 32px;
+  margin-left: 0px;
+  margin-top: 0px;
+  padding: 6px;
+  border-width: 1px;
+  transition: opacity 0.3s;
+  cursor: pointer;
+  outline: solid rgb(200, 200, 200);
+}
+.vivaldi-translate-button > svg {
+  fill: var(--colorFg);
+}
+.vivaldi-translate-button:hover {
+  background-color: var(--colorBgLighter);
+}
+</style><div class="vivaldi-translate-button-container initial"><button class="vivaldi-translate-button"><svg width="16" height="16" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <path fill-rule="evenodd" clip-rule="evenodd" d="M13.848 3.349v.99H12.63c-.457 1.264-1.074 2.297-1.852 3.15.871.675 1.937 1.18 3.222 1.47-.245.247-.567.725-.719 1.015-1.361-.35-2.46-.922-3.349-1.682C9.5 9 9 9.5 8 10l-.638-.969C8.053 8.708 9 8 9.162 7.533c-.76-.88-1.344-1.947-1.8-3.194h-1.21v-.99h3.315V2h1.024v1.349h3.357zM9.992 6.773c.608-.666 1.09-1.469 1.454-2.434H8.478c.363.922.862 1.742 1.514 2.434z"></path>
+  <path d="M5.846 11.558H3.15L2.636 13H1l2.78-7h1.425L8 13H6.364l-.518-1.442zm-2.282-1.169h1.867l-.939-2.62-.928 2.62z"></path>
+</svg></button></div></template></span></html>

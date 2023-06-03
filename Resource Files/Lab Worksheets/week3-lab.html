@@ -1,0 +1,502 @@
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<link href="./week3-lab_files/mystyle.css" rel="stylesheet" type="text/css">
+</head>
+
+<body style="" data-new-gr-c-s-check-loaded="14.1111.0" data-gr-ext-installed="">
+
+<div id="container">
+
+<div id="header">
+<h1>Parallel Programming Lab, Week 3:<br>Workload Decompositions, and a "Simulation"</h1>
+
+</div>
+
+<div id="content">
+
+<p>
+This week we will complete the work started last week on the parallel
+Mandelbrot Set, incorporating ideas on index space decomposition formats
+introduced in last week's lecture.  Then we will start parallelizing a new
+example illustrative of some of the features of "simulation"-type programs.
+The new example is the cellular automaton called Conway's Game of Life.
+</p>
+
+<h2>Generalizing the parallel Mandelbrot Set</h2>
+
+<p>
+If you successfully completed last week's lab, one of the programs you
+produced may have looked something like this:
+</p><pre>  import java.awt.Color ;
+  import java.awt.image.BufferedImage ;
+  
+  import javax.imageio.ImageIO;
+  
+  import java.io.File ;
+  
+  public class ParallelMandelbrot extends Thread {
+  
+      final static int N = 4096 ;
+      final static int CUTOFF = 100 ; 
+  
+      static int [] [] set = new int [N] [N] ;
+  
+      public static void main(String [] args) throws Exception {
+  
+          // Calculate set
+  
+          long startTime = System.currentTimeMillis();
+  
+          ParallelMandelbrot thread0 = new ParallelMandelbrot(0) ;
+          ParallelMandelbrot thread1 = new ParallelMandelbrot(1) ;
+  
+          thread0.start() ;
+          thread1.start() ;
+  
+          thread0.join() ;
+          thread1.join() ;
+  
+          long endTime = System.currentTimeMillis();
+  
+          System.out.println("Calculation completed in " +
+                             (endTime - startTime) + " milliseconds");
+  
+          // Plot image
+  
+          BufferedImage img = new BufferedImage(N, N,
+                                                BufferedImage.TYPE_INT_ARGB) ;
+  
+          // Draw pixels
+  
+          for (int i = 0 ; i &lt; N ; i++) {
+              for (int j = 0 ; j &lt; N ; j++) {
+  
+                  int k = set [i] [j] ;
+  
+                  float level ;
+                  if(k &lt; CUTOFF) {
+                      level = (float) k / CUTOFF ;
+                  }
+                  else {
+                      level = 0 ;
+                  }
+                  Color c = new Color(0, level, 0) ;  // Green
+                  img.setRGB(i, j, c.getRGB()) ;
+              }
+          }
+      
+  
+          // Print file
+  
+          ImageIO.write(img, "PNG", new File("Mandelbrot.png"));
+      }
+  
+      int me ;
+  
+      public ParallelMandelbrot(int me) {
+          this.me = me ;
+      }
+  
+      public void run() {
+  
+          int begin, end ;
+ 
+          if (me == 0) {
+              begin = 0 ;
+              end = N/2 ;
+          }
+          else {  // me == 1
+              begin = N/2 ;
+              end = N ;
+          }
+
+          for(int i = begin ; i &lt; end ; i++) {
+              for(int j = 0 ; j &lt; N ; j++) {
+
+                  double cr = (4.0 * i - 2 * N) / N ;
+                  double ci = (4.0 * j - 2 * N) / N ;
+
+                  double zr = cr, zi = ci ;
+
+                  int k = 0 ;
+                  while (k &lt; CUTOFF &amp;&amp; zr * zr + zi * zi &lt; 4.0) {
+
+                      // z = c + z * z
+
+                      double newr = cr + zr * zr - zi * zi ;
+                      double newi = ci + 2 * zr * zi ;
+
+                      zr = newr ;
+                      zi = newi ;
+
+                      k++ ;
+                  }
+
+                  set [i] [j] = k ;
+              }
+          }
+      }
+  
+  }
+</pre>
+In this program the calculation loop is decomposed blockwise in the
+loop index <tt>i</tt>, and the work is divided over two threads.<p></p>
+
+<p>
+Now generalize this program to run on a number of threads defined by a
+constant <tt>P</tt> declared near the top of the class, e.g.:
+</p><pre>  final static int P = 4 ;
+</pre>
+Replace the code that creates, starts, and waits for completion of
+<tt>thread0</tt> and <tt>thread1</tt> by something like:
+<pre>        ParallelMandelbrot [] threads = new ParallelMandelbrot [P] ;
+        for(int me = 0 ; me &lt; P ; me++) {
+            threads [me] = new ParallelMandelbrot(me) ;
+            threads [me].start() ;
+        }
+
+        for(int me = 0 ; me &lt; P ; me++) {
+            threads [me].join() ;
+        }
+</pre>
+Here we create an array of threads, and initialize and complete them in loops
+(<span class="question">why do we need <i>two</i> loops over <tt>me</tt> here - could they be merged?</span>).
+<p></p>
+
+<p>
+Now, inside the <tt>run</tt> method, you can achieve a generalized
+block decomposition of work by changing the calculation of
+<tt>begin</tt> and <tt>end</tt> to:
+</p><pre>  int b = N/P ;  // block size
+
+  begin = me * b ;
+  end = begin + b ;
+</pre>
+This works as long as <tt>N</tt> is an exact multiple of <tt>P</tt> -
+the problem size is an exact multiple of the number of threads.  (You
+may want to think about how you could modify these calculations to
+remove this restriction.)<p></p>
+
+<p>
+With your generalized code, run the Mandelbrot set on (say) 2, 4, and 8
+threads, and record and interpret the times taken.</p>
+
+<p>
+Now use a <i>cyclic</i> decomposition.  You only need to change the
+<tt>run</tt> method.  You no longer really need the variables <tt>begin</tt>
+and <tt>end</tt> - instead you can just replace the loop over <tt>i</tt>
+(say) with something like this:
+</p><pre>  for(int i = me ; i &lt; N ; i+=P) { 
+      ...
+  }
+</pre>
+Again measure the performance with different numbers of threads.
+In particular what is the <i>parallel speedup</i> on four threads and
+on eight threads?
+<p></p>
+
+<p>
+On the lab machines, times for this Mandelbrot set computation tend to vary
+a great deal between runs.  Make sure you run all programs several times
+and use the best times for sequential and parallel programs for calculating
+speedup.  Anecdotally, increasing the problem size (e.g. doubling N) may make
+timings more reproducible.
+</p>
+
+<h2>Conway's Game of Life</h2>
+
+<p>
+The Mandelbrot Set illustrates some features of parallel programming.
+But in the end it belongs to the category of what are called "embarassingly
+parallel" problems.  It is easy to make it parallel because the calculation
+at any point doesn't depend on the calculation at any other point.</p>
+
+<p>
+This makes it pretty easy to parallelize, but it is not a characteristic
+shared by many of the important kinds of problem people are interested in
+solving.  One major area of application of parallel processing is in
+<i>simulations</i> of large systems.  These simulations are usually <i>not</i>
+embarassingly parallel - developments in one part of the simulation usually
+have direct or indirect effects on developments everywhere else.</p>
+
+<p>
+As a first example of this kind of behaviour, we will look at Conway's
+Game of Life.  Again, if you haven't come across this before, look it up in
+<a href="http://en.wikipedia.org/wiki/Conway&#39;s_Game_of_Life">Wikipedia</a>.
+</p>
+
+<p>
+Life is a very simple example of a <i>cellular automaton</i>.
+Imagine a "board" divided into square cells - something like a large "Go"
+board.  Beads are placed in some of the cells of the board.
+A cell is <i>live</i> if it holds a bead or <i>dead</i> if it does not.</p>
+A <i>generation</i> is a snapshot of the state of the board at a particular
+time.<p></p>
+
+<p>
+The fate of a cell of the Life board in the <i>next</i> generation is entirely
+determined by the state of the cell and its neighbouring cells in the
+<i>current</i> generation.  Each cell is defined to have <i>eight</i>
+neighbours - diagonal neighbours are included here.
+The rule for the fate of a cell is as follows:
+</p><ul>
+<li>
+Any cell with exactly two live neighbours doesn't change in the next generation.
+</li>
+<li>
+Any cell with exactly three live neighbours will be alive in the next generation.
+</li>
+<li>
+A cell with any <i>other</i> number of live neighbours will be dead in the next generation.
+</li>
+</ul>
+<p>
+
+</p><p>
+Here is a sequential Java program to simulate the evolution of the
+Life board:
+</p><pre>  import java.awt.* ;
+  import javax.swing.* ;
+
+  public class Life {
+
+      final static int N = 1024 ;
+      final static int CELL_SIZE = 1 ;
+      final static int DELAY = 0 ;
+
+      static int [][] state = new int [N][N] ;
+
+      static int [][] sums  = new int [N][N] ;
+
+      static Display display = new Display() ;
+  
+      public static void main(String args []) throws Exception {
+  
+          // Define initial state of Life board
+  
+          for(int i = 0 ; i &lt; N ; i++) {
+              for(int j = 0 ; j &lt; N ; j++) {
+                  state [i] [j] = Math.random() &gt; 0.5 ? 1 : 0 ;
+              }
+          }
+  
+          display.repaint() ;
+          pause() ;
+  
+          // Main update loop.
+  
+          int iter = 0 ;
+          while(true) {
+  
+              System.out.println("iter = " + iter++) ;
+  
+              // Calculate neighbour sums.
+  
+              for(int i = 0 ; i &lt; N ; i++) {
+                   for(int j = 0 ; j &lt; N ; j++) {
+  
+                        // find neighbours...
+                        int ip = (i + 1) % N ;
+                        int im = (i - 1 + N) % N ;
+                        int jp = (j + 1) % N ;
+                        int jm = (j - 1 + N) % N ;
+  
+                        sums [i] [j] =
+                            state [im] [jm] + state [im] [ j] + state [im] [jp] +
+                            state [ i] [jm]                   + state [ i] [jp] +
+                            state [ip] [jm] + state [ip] [ j] + state [ip] [jp] ;
+                  }
+              }
+  
+              // Update state of board values.
+      
+              for(int i = 0 ; i &lt; N ; i++) {
+                  for(int j = 0 ; j &lt; N ; j++) {
+                      switch (sums [i] [j]) {
+                          case 2 : break;
+                          case 3 : state [i] [j] = 1; break;
+                          default: state [i] [j] = 0; break;
+                      }
+                  }
+              }
+      
+              display.repaint() ;
+              pause() ;
+          }
+      }
+  
+      static class Display extends JPanel {
+  
+          final static int WINDOW_SIZE = N * CELL_SIZE ;
+  
+          Display() {
+
+              setPreferredSize(new Dimension(WINDOW_SIZE, WINDOW_SIZE));
+
+              JFrame frame = new JFrame("Life");
+              frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+              frame.setContentPane(this);
+              frame.pack();
+              frame.setVisible(true);
+          }
+  
+          public void paintComponent(Graphics g) {
+              g.setColor(Color.BLACK) ;
+              g.fillRect(0, 0, WINDOW_SIZE, WINDOW_SIZE) ;
+              g.setColor(Color.WHITE) ;
+              for(int i = 0 ; i &lt; N ; i++) {
+                  for(int j = 0 ; j &lt; N ; j++) {
+                      if(state [i] [j] == 1) {
+                          g.fillRect(CELL_SIZE * i, CELL_SIZE * j,
+                                     CELL_SIZE, CELL_SIZE) ;
+                      }
+                  }
+              } 
+          }
+      }
+  
+      static void pause() {
+          try {
+              Thread.sleep(DELAY) ;
+          }
+          catch(InterruptedException e) {
+              e.printStackTrace() ;
+              System.exit(1) ;
+          }
+      }
+  }
+</pre>
+You don't need to worry much about the nested class <tt>Display</tt>
+at the bottom of this code.  As the name suggests it is just used to display
+the current state of the Life board.<p></p>
+
+<p>
+The main array of the problem is <tt>state</tt>.  This represents
+the Life board, and is 1 for live cells and 0 for dead cells.
+<tt>sums</tt> is an extra array that will be used to keep a record of
+the number of live neighbours of a particular cell.</p>
+<p></p>
+
+<p>
+The board is initialized randomly, with a fifty-fifty chance of a given
+cell being alive or dead.</p>
+
+<p>
+The main loop is an infinite loop over generations.  Inside that is
+a loop over cells that calculates how many live neighbours that cell
+has (by just adding up the <tt>state</tt> values of the neighbours).
+Then there is another loop over cells which calculates the state of
+the cell in the next generation in terms of it's number of live neighbours.
+</p>
+
+<p>
+The calculation of subscripts for cells neighbouring <i>i</i> and
+<i>j</i> needs some explanation.  The most obvious way of calculating
+index of a neighbour in the positive <i>i</i> direction, say, would be
+as <span class="eqn"><i>i</i> + 1</span>.  But that causes a problem
+at the edges of the board when <i>i</i> is <span class="eqn"><i>N</i>
+- 1</span>.  We can't have a subscript value of <i>N</i> in a Java array
+of size <i>N</i>.  The same problem arises for negative neighbours of
+cells with subcript 0.
+</p>
+
+<p>
+Convince yourself that the prescription given above circumvents this
+problem by making the board to "wrap around" at the edges - the positive
+neighbour of <span class="eqn"><i>N</i> - 1</span> is 0, and the negative
+neighbour of 0 is <span class="eqn"><i>N</i> - 1</span>.</p>
+
+<h2>Sequential Experiments</h2>
+
+<p>
+Experiment with the Life program.  Run it for different sizes of board,
+controlled by the constant <tt>N</tt>.  The constant <tt>CELL_SIZE</tt>
+only controls the display - it is the width of a cell in pixels.  You
+may want to increase this to get a better view of what is going on.
+It may also be helpful to set <tt>DELAY</tt> to a non-zero value.
+This just controls a delay in milliseconds between generations - again
+increasing this may give you get a better idea of how things work.</p>
+
+<p>
+For the time being we won't bother with timings.  The trouble is that
+the graphics display slows things down, and the timings we usually
+care about are for the <i>computations</i>.  Eventually - when we have a clear
+idea of how our programs are behaving - we may strip out the graphics
+and try some benchmarking.</p>
+
+<h2>Exercise</h2>
+
+<p>
+Try to parallelize the <tt>Life</tt> program following a strategy similar
+to the one we used with the <tt>Mandelbrot</tt> program.
+</p>
+
+<p>
+The initialization loops can be left in the <tt>main</tt> method.
+But the "Main update loop" should be moved into the <tt>run</tt> method
+of your <tt>ParallelLife</tt> class.  Try to write the code to
+run on <tt>P</tt> threads (with <tt>P</tt> declared as a constant).
+
+</p><p>
+<i>Hints</i>: The whole of the main <tt>while(true)</tt> loop will run in
+each thread, but <i>both</i> the embedded loop nests over <i>i</i> and <i>j</i>
+("Calculate neighbour sums" and "Update state of board values")
+are candidates for decomposition, similar to that done in the main
+loops of the Mandelbrot code above.  For now just use a blockwise
+decomposition of the <i>i</i> loops - <i>cyclic decomposition is not very
+appropriate here</i>.</p>
+
+<p>
+One thing to bear in mind is that in general you do <i>not</i> particularly
+want I/O operations to run in parallel on multiple threads.  This will
+lead to confusion and possibly errors.  In
+the <i>Life</i> code there are two output operations - the <tt>System.out.println</tt> call that prints the current iteration number, and the
+<tt>display.repaint()</tt> operation that dumps the graphic display
+of the board state.  I suggest that you leave just thread 0 to do both
+these operations, by enclosing these lines in an <tt>if</tt> construct like:
+</p><pre>  if(me == 0) {
+      ...
+  }
+</pre>
+<p></p>
+
+<p>
+Does your code appear to work correctly?  Try running it in four threads, then,
+just to be sure, try running
+it with a <i>large</i> number of threads - e.g. try a run something
+like this:
+</p><pre>  final static int P = 256 ;
+  final static int N = 256 ;
+  final static int CELL_SIZE = 4 ;
+</pre>
+<p></p>
+
+</div>
+
+<div id="footer">
+Copyright © University of Portsmouth, 2020
+</div>
+
+
+
+
+</div></body><grammarly-desktop-integration data-grammarly-shadow-root="true"><template shadowrootmode="open"><style>
+  div.grammarly-desktop-integration {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+    -moz-user-select: none;
+    -webkit-user-select: none;
+    -ms-user-select:none;
+    user-select:none;
+  }
+
+  div.grammarly-desktop-integration:before {
+    content: attr(data-content);
+  }
+</style><div aria-label="grammarly-integration" role="group" tabindex="-1" class="grammarly-desktop-integration" data-content="{&quot;mode&quot;:&quot;full&quot;,&quot;isActive&quot;:true,&quot;isUserDisabled&quot;:false}"></div></template></grammarly-desktop-integration></html>

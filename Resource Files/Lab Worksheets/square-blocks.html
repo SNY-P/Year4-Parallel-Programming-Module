@@ -1,0 +1,247 @@
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<link href="./square-blocks_files/mystyle.css" rel="stylesheet" type="text/css">
+</head>
+
+<body style="" data-new-gr-c-s-check-loaded="14.1111.0" data-gr-ext-installed="">
+
+<div id="container">
+
+<div id="header">
+<h1>Parallel Programming Lab, Week 7:<br>An MPJ Task Farm (continued)</h1>
+
+</div>
+
+<div id="content">
+
+<h3>"Slow Mandelbrot" Task Farm with Square Blocks</h3>
+
+<pre>  import mpi.* ;
+  
+  import java.awt.* ;
+  import javax.swing.* ;
+
+  public class MPJSquaresMandelbrot {
+
+      final static int N = 1024 ;
+      final static int CUTOFF = 100000 ; 
+
+      final static int BLOCK_EDGE = 64 ;  // side of square block (should divide N).
+
+      final static int BLOCK_SIZE = BLOCK_EDGE * BLOCK_EDGE ;
+
+      final static int NUM_BLOCKS  = (N * N) / BLOCK_SIZE ;
+      final static int BUFFER_SIZE = 2 + BLOCK_SIZE * N ;
+      
+      // tag values
+      final static int TAG_HELLO   = 0 ;
+      final static int TAG_RESULT  = 1 ;
+      final static int TAG_TASK    = 2 ;
+      final static int TAG_GOODBYE = 3 ;
+      
+      static int [] [] set ;
+
+      public static void main(String [] args) throws Exception {
+      
+          MPI.Init(args) ;
+		  
+          int me = MPI.COMM_WORLD.Rank() ;
+          int P = MPI.COMM_WORLD.Size() ;
+
+          int numWorkers = P - 1 ;
+          
+          int [] buffer = new int [BUFFER_SIZE] ;
+              
+          if(me == 0) {  // master process - sends out work and displays results
+          
+              set = new int [N] [N] ;
+              Display display = new Display() ;
+		 
+              for(int i = 0 ; i &lt; N ; i++) {
+                  for(int j = 0 ; j &lt; N ; j++) {
+                      set [i] [j] = -1 ;
+                  }
+              }
+              display.repaint() ;
+
+              // Calculate set
+
+              long startTime = System.currentTimeMillis();
+
+              int nextBlockStart_i = 0 ;
+              int nextBlockStart_j = 0 ;
+              int numHellos = 0 ;
+              int numBlocksReceived = 0 ;
+              
+              while(numBlocksReceived &lt; NUM_BLOCKS || numHellos &lt; numWorkers) {
+
+                  // Receive hello or results from any worker
+
+                  Status status =
+                          MPI.COMM_WORLD.Recv(buffer, 0, BUFFER_SIZE, MPI.INT,
+                                              MPI.ANY_SOURCE, MPI.ANY_TAG) ;
+
+                  if(status.tag == TAG_RESULT) {  
+
+                      // Save returned results to `set' and display
+
+                      int resultBlockStart_i = buffer [0] ;
+                      int resultBlockStart_j = buffer [1] ;
+                      for(int i = 0 ; i &lt; BLOCK_EDGE ; i++) {
+                          for(int j = 0 ; j &lt; BLOCK_EDGE ; j++) {
+                              set [resultBlockStart_i + i] [resultBlockStart_j + j] = buffer [2 + BLOCK_EDGE * i + j] ;
+                          }
+                      }
+                      numBlocksReceived++ ;
+                      display.repaint() ; 
+                  }
+                  else {  // tag is TAG_HELLO
+                      numHellos++ ;
+                  }
+                  
+                  // Send next block of work or finish tag to same worker                  
+                  if(nextBlockStart_j &lt; N) {
+                      buffer [0] = nextBlockStart_i ;
+                      buffer [1] = nextBlockStart_j ;
+                      MPI.COMM_WORLD.Send(buffer, 0, 2, MPI.INT, status.source, TAG_TASK) ;
+                      nextBlockStart_i += BLOCK_EDGE ;
+                      if(nextBlockStart_i &gt;= N) {
+                          nextBlockStart_i = 0 ;
+                          nextBlockStart_j += BLOCK_EDGE ;
+                      }
+                      System.out.println("Sending work to " + status.source) ;
+                  }
+                  else {
+                      MPI.COMM_WORLD.Send(buffer, 0, 0, MPI.INT, status.source, TAG_GOODBYE) ;  
+                      System.out.println("Shutting down " + status.source) ;
+                  }                  
+              }
+              
+              long endTime = System.currentTimeMillis();
+
+              System.out.println("Calculation completed in " +
+                                 (endTime - startTime) + " milliseconds");                    
+          }
+          else {  // worker process
+          
+              // Send request to master for a first block of work
+
+              MPI.COMM_WORLD.Send(buffer, 0, 0, MPI.INT, 0, TAG_HELLO) ;
+              
+              boolean done = false ;
+              while(!done) {
+                  Status status = MPI.COMM_WORLD.Recv(buffer, 0, 2, MPI.INT, 0, MPI.ANY_TAG) ;
+                  
+                  if(status.tag == TAG_TASK) {
+                      int blockStart_i = buffer [0] ;
+                      int blockStart_j = buffer [1] ;
+
+                      for(int i = 0 ; i &lt; BLOCK_EDGE ; i++) {
+                          for(int j = 0 ; j &lt; BLOCK_EDGE ; j++) {
+
+                               double cr = (4.0 * (blockStart_i + i) - 2 * N) / N ;
+                               double ci = (4.0 * (blockStart_j + j) - 2 * N) / N ;
+
+                               double zr = cr, zi = ci ;
+
+                               int k = 0 ;
+                               while (k &lt; CUTOFF &amp;&amp; zr * zr + zi * zi &lt; 4.0) {
+
+                                   // z = c + z * z
+
+                                   double newr = cr + zr * zr - zi * zi ;
+                                   double newi = ci + 2 * zr * zi ;
+
+                                   zr = newr ;
+                                   zi = newi ;
+
+                                   k++ ;
+                              }
+
+                              buffer [2 + BLOCK_EDGE * i + j] = k ;
+                          }
+                      }
+                      buffer [0] = blockStart_i ;
+                      buffer [1] = blockStart_j ;
+                      MPI.COMM_WORLD.Send(buffer, 0, BUFFER_SIZE, MPI.INT, 0, TAG_RESULT) ;
+                  }
+                  else {  // tag is TAG_GOODBYE
+                      done = true ;
+                  }
+              }       
+          }
+
+          MPI.Finalize() ;
+      }
+
+      static class Display extends JPanel {
+
+          Display() {
+
+              setPreferredSize(new Dimension(N, N)) ;
+
+              JFrame frame = new JFrame("Laplace");
+              frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+              frame.setContentPane(this);
+              frame.pack();
+              frame.setVisible(true);
+          }
+
+          public void paintComponent(Graphics g) {
+              for(int i = 0 ; i &lt; N ; i++) {
+                  for(int j = 0 ; j &lt; N ; j++) {
+                      int k = set [i] [j] ;
+                      Color c ;
+
+                      if(k == -1) {  // uninitialized
+                          c = Color.WHITE ;
+                      }
+                      else {
+                          float level ;
+                          if(k &lt; CUTOFF) {
+                              level = k &lt; 50 ? (float) k / 50 : 1.0F ;
+                          }
+                          else {
+                              level = 0 ;
+                          }
+                          c = new Color(level/2, level/2, level) ;  // Blueish
+                      }
+
+                      g.setColor(c) ;
+                      g.fillRect(i, j, 1, 1) ;
+                  }
+              }
+          }
+      }
+  }
+</pre>
+
+</div>
+
+<div id="footer">
+Copyright © University of Portsmouth, 2019
+</div>
+
+
+
+
+</div></body><grammarly-desktop-integration data-grammarly-shadow-root="true"><template shadowrootmode="open"><style>
+  div.grammarly-desktop-integration {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+    -moz-user-select: none;
+    -webkit-user-select: none;
+    -ms-user-select:none;
+    user-select:none;
+  }
+
+  div.grammarly-desktop-integration:before {
+    content: attr(data-content);
+  }
+</style><div aria-label="grammarly-integration" role="group" tabindex="-1" class="grammarly-desktop-integration" data-content="{&quot;mode&quot;:&quot;full&quot;,&quot;isActive&quot;:true,&quot;isUserDisabled&quot;:false}"></div></template></grammarly-desktop-integration></html>

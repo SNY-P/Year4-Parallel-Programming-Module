@@ -1,0 +1,630 @@
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<link href="./week4-lab_files/mystyle.css" rel="stylesheet" type="text/css">
+</head>
+
+<body style="" data-new-gr-c-s-check-loaded="14.1111.0" data-gr-ext-installed="">
+
+<div id="container">
+
+<div id="header">
+<h1>Parallel Programming Lab, Week 4:<br>Parallel Programs with Interacting Threads</h1>
+
+</div>
+
+<div id="content">
+
+<p>
+We are approaching the end of our brief introduction to parallel programming
+on shared memory systems - in our case the multicore processors on a desktop
+or laptop PC.
+In this lab we will see how to use barrier synchronization across threads
+in Java.  I also introduce one new example - a problem from science and
+engineering called Laplace's Equation.  As an extra topic, there is
+brief foray into OpenMP.</p>
+
+<h2>A Parallel Game of Life</h2>
+
+<p>
+Read over last week's lecture about race conditions and barrier
+sychronization in parallel programs.  Here is a fully synchronized
+(and correct!) parallel version of Conway's Game of Life:
+</p><pre>  import java.awt.* ;
+  import javax.swing.* ;
+  
+  import java.util.concurrent.CyclicBarrier ;
+  
+  public class ParallelLife extends Thread {
+  
+      final static int N = 256 ;
+      final static int P = 256 ;  // Number of threads
+      final static int CELL_SIZE = 4 ;
+      final static int DELAY = 0 ;
+  
+      static int [][] state = new int [N][N] ;
+      static int [][] sums  = new int [N][N] ;
+  
+      static Display display = new Display() ;
+  
+      static CyclicBarrier barrier = new CyclicBarrier(P) ;
+  
+      public static void main(String args []) throws Exception {
+  
+          // Define initial state of Life board
+  
+          for(int i = 0 ; i &lt; N ; i++) {
+              for(int j = 0 ; j &lt; N ; j++) {
+                  state [i] [j] = Math.random() &gt; 0.5 ? 1 : 0 ;
+              }
+          }
+  
+          display.repaint() ;
+          pause() ;
+  
+          ParallelLife [] threads = new ParallelLife [P] ;
+          for(int me = 0 ; me &lt; P ; me++) {
+              threads [me] = new ParallelLife(me) ;
+              threads [me].start() ;
+          }
+  
+          for(int me = 0 ; me &lt; P ; me++) {
+              threads [me].join() ;
+          }
+      }
+  
+      int me ;
+  
+      ParallelLife(int me) {
+          this.me = me ;
+      }
+  
+      final static int B = N / P ;  // block size
+   
+      public void run() {
+          
+          int begin = me * B ;
+          int end = begin + B ;
+  
+          // Main update loop.
+  
+          int iter = 0 ;
+          while(true) {
+  
+              if(me == 0)
+                  System.out.println("iter = " + iter++) ;
+  
+              // Calculate neighbour sums.
+  
+              for(int i = begin ; i &lt; end ; i++) {
+                   for(int j = 0 ; j &lt; N ; j++) {
+  
+                        // find neighbours...
+                        int ip = (i + 1) % N ;
+                        int im = (i - 1 + N) % N ;
+                        int jp = (j + 1) % N ;
+                        int jm = (j - 1 + N) % N ;
+  
+                        sums [i] [j] =
+                            state [im] [jm] + state [im] [ j] + state [im] [jp] +
+                            state [ i] [jm]                   + state [ i] [jp] +
+                            state [ip] [jm] + state [ip] [ j] + state [ip] [jp] ;
+                  }
+              }
+  
+              <span style="color:red">synch() ;</span>
+  
+              // Update state of board values.
+      
+              for(int i = begin ; i &lt; end ; i++) {
+                  for(int j = 0 ; j &lt; N ; j++) {
+                      switch (sums [i] [j]) {
+                          case 2 : break;
+                          case 3 : state [i] [j] = 1; break;
+                          default: state [i] [j] = 0; break;
+                      }
+                  }
+              }
+      
+              <span style="color:red">synch() ;</span>
+  
+              if(me == 0)
+                  display.repaint() ;
+  
+              pause() ;
+          }
+      }
+  
+      static class Display extends JPanel {
+  
+          final static int WINDOW_SIZE = N * CELL_SIZE ;
+  
+          Display() {
+  
+              JFrame frame = new JFrame("Life");
+              frame.setSize(WINDOW_SIZE, WINDOW_SIZE);
+              frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+              frame.setContentPane(this);
+              frame.setVisible(true);
+          }
+  
+          public void paintComponent(Graphics g) {
+              g.setColor(Color.BLACK) ;
+              g.fillRect(0, 0, WINDOW_SIZE, WINDOW_SIZE) ;
+              g.setColor(Color.WHITE) ;
+              for(int i = 0 ; i &lt; N ; i++) {
+                  for(int j = 0 ; j &lt; N ; j++) {
+                      if(state [i] [j] == 1) {
+                          g.fillRect(CELL_SIZE * i, CELL_SIZE * j,
+                                     CELL_SIZE, CELL_SIZE) ;
+                      }
+                  }
+              } 
+          }
+      }
+  
+      <span style="color:red">static void synch() {
+          try {
+              barrier.await() ;
+          }
+          catch(Exception e) {
+              e.printStackTrace() ;
+              System.exit(1) ;
+          }
+      }</span>
+  
+      static void pause() {
+          try {
+              Thread.sleep(DELAY) ;
+          }
+          catch(InterruptedException e) {
+              e.printStackTrace() ;
+              System.exit(1) ;
+          }
+      }
+  }
+</pre>
+If you followed the advice in last week's lab script you may have come
+up with something similar - though at that stage probably would not have
+put in the important <i>barriers</i>.<p></p>
+
+<p>
+For barrier synchronization we are using the standard Java class:
+</p><pre>  <a href="http://docs.oracle.com/javase/1.5.0/docs/api/java/util/concurrent/CyclicBarrier.html">java.util.concurrent.CyclicBarrier</a>
+</pre>
+Note the constructor of this takes the number of threads that are
+to be synchronized as an argument.  It is convenient here to wrap the call
+to <tt>await()</tt> in our own method <tt>synch()</tt>, just to get the
+annoying code for exception handling out of the main logic.<p></p>
+
+<p>
+Each thread
+can call <tt>await()</tt> on a single barrier many times - this is the
+sense in which it is "cyclic".  But, each time it is called,
+<i>all </i><tt>P</tt><i> threads must make the call</i> (this
+is sometimes called a <i>collective call</i>.)</p>
+
+<p>
+Run this program and check the behaviour looks plausibly correct.
+Notice we are running a relatively <i>small</i> Life board in a rather
+<i>large</i> number of threads (much larger than the available number of
+cores).  The idea here is just to push the envelope with the level of
+concurrency in the program, to get some confidence that a parallel
+program with synchronization really does always get results <i>correct</i>.
+</p>
+
+<p>
+If you didn't do something similar last week, comment out the two
+calls to <tt>synch</tt>, and run the program again.  Is it working correctly?
+What if you only comment out <i>one</i> of the two calls - are they
+both essential?</p>
+
+<h2>Solving the Laplace Equation</h2>
+
+<p>
+We will leave benchmarking the parallel Game of Life as an exercise.
+Before attempting that, study the new example below.</p>
+
+<p>First, a mathematical aside.  You may or may not find this helpful - in
+the end we are just interested in parallelizing a given sequential
+algorithm...</p>
+
+<p>
+The two dimensional
+<a href="http://en.wikipedia.org/wiki/Laplace&#39;s_equation">Laplace
+equation</a> is an equation that crops up in several places in physics
+and mathematics.  We don't need to worry much about what those
+places are - it is introduced here just as an example of a relatively
+simple numerical problem in science and engineering that can be tackled
+by parallel programming.</p>
+
+<p>
+We are interested in the Laplace equation on a two-dimensional grid
+of points.  In this incarnation, if
+we store the unknown variables of the equation in the elements of an
+array called <tt>phi</tt>, then one way of writing the equations for
+these variables is:
+</p><pre>  phi [i] [j] =
+      0.25 * (phi [i] [j - 1] + phi [i] [j + 1] +
+              phi [i - 1] [j] + phi [i + 1] [j])
+</pre>
+In other words, the element <tt>phi [i] [j]</tt> should be equal to the
+<i>average</i> of its four immediately neighbouring elements.  This
+condition has to be satisfied <i>everywhere</i> in some region of
+the (<i>i</i>, <i>j</i>) grid.  (Often we are <i>given</i> fixed values
+of <tt>phi</tt> around the borders of the region in question, and required
+to find the values of <tt>phi</tt> <i>inside</i> the region.)<p></p>
+
+<p>
+An <i>iterative</i> numerical approach to solving the equation is just
+to initially set all elements of <tt>phi</tt> that we have to solve for
+to some value like zero, then repeatedly change individual <tt>phi
+[i] [j]</tt> elements to be the average of their neighbours.  If we repeat
+this local update sufficiently many times, the <tt>phi</tt> elements
+converge to the global solution of the equations.  This is called the
+<i>relaxation method</i>.</p>
+
+<p>
+That is the end of our mathematical aside.  Now just try to run the
+sequential program below:
+</p><pre>  import java.awt.* ;
+  import javax.swing.* ;
+  
+  public class Laplace {
+  
+      final static int N = 256 ;
+      final static int CELL_SIZE = 2 ; 
+      final static int NITER = 100000 ;
+      final static int OUTPUT_FREQ = 1 ;
+  
+      static float [][] phi = new float [N][N] ;
+      static float [][] newPhi = new float [N][N] ;
+  
+      static Display display = new Display() ;
+  
+      public static void main(String args []) throws Exception {
+  
+          // Make voltage non-zero on left and right edges
+  
+          for(int j = 0 ; j &lt; N ; j++) {
+              phi [0] [j] = 1.0F ;
+              phi [N-1] [j] = 1.0F ;
+          }
+  
+          display.repaint() ;
+  
+          // Main update loop.
+  
+          long startTime = System.currentTimeMillis();
+  
+          for(int iter = 0 ; iter &lt; NITER ; iter++) {
+  
+              // Calculate new phi
+  
+              for(int i = 1 ; i &lt; N - 1 ; i++) {
+                   for(int j = 1 ; j &lt; N - 1 ; j++) {
+  
+                        newPhi [i] [j] =
+                                0.25F * (phi [i] [j - 1] + phi [i] [j + 1] +
+                                         phi [i - 1] [j] + phi [i + 1] [j]) ;
+                  }
+              }
+  
+              // Update all phi values
+      
+              for(int i = 1 ; i &lt; N - 1 ; i++) {
+                  for(int j = 1 ; j &lt; N - 1 ; j++) {
+                      phi [i] [j] = newPhi [i] [j] ;
+                  }
+              }
+      
+              if(iter % OUTPUT_FREQ == 0) {
+                  System.out.println("iter = " + iter) ;
+                  display.repaint() ;
+              }
+          }
+  
+          long endTime = System.currentTimeMillis();
+  
+          System.out.println("Calculation completed in " +
+                             (endTime - startTime) + " milliseconds");
+  
+          display.repaint() ;
+      }
+  
+      static class Display extends JPanel {
+  
+          final static int WINDOW_SIZE = N * CELL_SIZE ;
+  
+          Display() {
+  
+              setPreferredSize(new Dimension(WINDOW_SIZE, WINDOW_SIZE)) ;
+  
+              JFrame frame = new JFrame("Laplace");
+              frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+              frame.setContentPane(this);
+              frame.pack();
+              frame.setVisible(true);
+          }
+  
+          public void paintComponent(Graphics g) {
+              for(int i = 0 ; i &lt; N ; i++) {
+                  for(int j = 0 ; j &lt; N ; j++) {
+                      float f = phi [i] [j] ;
+                      Color c = new Color(f, 0.0F, 1.0F - f) ;
+                      g.setColor(c) ;
+                      g.fillRect(CELL_SIZE * i, CELL_SIZE * j,
+                                 CELL_SIZE, CELL_SIZE) ;
+                  }
+              } 
+          }
+      }
+  }
+</pre>
+In this example, the region of the <i>(i, j)</i> plane where we are
+calculating <tt>phi</tt> is given by the range of values
+<i>i</i> = 1, ..., <i>N</i>-2 and <i>j</i> = 1, ..., <i>N</i>-2.<p></p>
+
+<p>On the outer boundary of the square (<i>i</i> or <i>j</i> are 0 or
+<i>N</i>-1) <tt>phi</tt> stays fixed -
+equal to zero on the top and bottom edges and 1.0 on the left and right
+edges (<i>boundary conditions</i>).</p>
+
+<p>
+Pictorially, the array is organized like this:
+</p>
+<p>
+<img src="./week4-lab_files/LaplaceSequential.jpg" height="400">
+</p>
+<p>
+The yellow border represents array elements where the field <tt>phi</tt>
+is set to fixed boundary values.  The central green area represents
+array elements that will be updated in the algorithm.  The numbers at
+the side of the grid represent the ranges of the indexes used in the
+update loops.</p>
+
+<p>An engineering way of thinking of this is that we have a hollow
+metal box with a fixed voltage of 0 on the top and bottom faces,
+and a fixed voltage of 1 on the left and right faces.  Then the solution
+for the inner <tt>phi</tt> elements is the <i>voltage field</i> (or more
+correctly the <i>electrical potential</i>) in the space inside the box.</p>
+
+<p>
+On the display a voltage of zero is represented by the colour blue and
+a voltage of 1.0 is represented by the colour red.</p>
+
+<p>
+Initially only the
+extreme left and right edges are red.  But as voltages are averaged with
+neighbours over many iterations the "redness" spreads over the square.
+Eventually we reached a converged state for the voltage field, with
+red and blue areas symmetric in the square.  This is now an approximate
+solution of the Laplace equation</p>
+
+<p>
+Don't get bogged down in the details.  Look at the form of the code.
+The overall pattern is very similar to the Life simulation we ran earlier.
+There is an outer loop over iterations which is now itself a for loop,
+but that doesn't change parallelization of the inner loops.</p>
+
+<p>
+Apart from the small matter of the actual calculation inside the inner
+loops that we want to parallelize, there is only one minor change to their
+structure - the ranges of <i>i</i> and <i>j</i> now go from
+1 to <span class="eqn"><i>N</i>-2</span> rather than 0 to
+<span class="eqn"><i>N</i>-1</span>.</p>
+
+<p>
+When you come to parallelize this, I suggest you take this into account
+by code like something like this:
+</p><pre>        int begin = me * B ;
+        int end = begin + B ;
+
+        if(me == 0)
+            begin = 1 ;
+
+        if(me == P-1)
+            end = N - 1 ;
+</pre>
+inside the <tt>run()</tt> methods of the threads - modifying the domains
+in the leftmost and rightmost threads.<p></p>
+
+<h2>Exercises</h2>
+
+<ol>
+<li>
+<p>
+Try to parallelize the <tt>Laplace</tt> following a pattern almost
+identical to the one used in <tt>ParallelLife</tt> above.
+<!--
+If you get really stuck, there is a solution <a
+href="parallel-laplace.html">here</a>.
+-->
+</p>
+</li>
+<li>
+<p>
+Benchmark the sequential and parallel version of the Laplace equation using
+various number of threads (e.g. 2, 4, 8).  Calculate parallel speedups
+and efficiencies.
+</p>
+<p>
+Before doing benchmarks, <i>increase the value of the
+</i><tt>OUTPUT_FREQ</tt><i> constant</i> to, say, 1000.  This has the effect
+of making the output happen
+only every 1000 iterations.</p>
+<p>
+Without this change it is likely that the overhead of the graphic output
+would dominate the time for the calculations, and it is the time for the
+calculations that are most important here.</p>
+<p>
+Estimate the overheads of the barrier calls by simply commenting them out
+and running again.
+(This <i>may</i> lead to incorrect numerical results for the voltage field,
+but it allows you to estimate how much synchronization costs!)</p>
+</li>
+<li>
+<p>
+If you have access to a suitable Linux system, benchmark a parallel Life
+program implemented using <i>OpenMP</i>, following the outline below.
+</p>
+</li>
+</ol>
+
+<h2><i>Special Topic</i>: Using OpenMP</h2>
+
+<p>
+<i>[To run this example following exactly the instructions below, you
+will need access to a Linux system.  However it should be possible
+to adapt to Windows if you have a compatible C/C++ IDE.]</i></p>
+
+<p>
+At the end of the week 3 lecture we briefly discussed the OpenMP "API"
+for shared memory parallel programming.  Try the example below.
+You will have to be prepared to edit a little C or C++, but the code here
+is sufficiently similar to Java that this shouldn't be too intimidating!</p>
+
+<p>
+Under Linux, using a text editor such as <tt>gedit</tt>, create a 
+file called <tt>life.cc</tt> containing the following C++ program:
+</p><pre>  #include &lt;omp.h&gt;
+  #include &lt;stdio.h&gt;
+  #include &lt;stdlib.h&gt;
+  
+  #define N 32
+  #define NITER 100
+  
+  int state [N] [N] ;
+  int sums  [N] [N] ;
+  
+  void printCells() ;
+  
+  int main(int argc, char *args []) {
+  
+      // Define initial state of Life board
+  
+      for(int i = 0 ; i &lt; N ; i++) {
+          for(int j = 0 ; j &lt; N ; j++) {
+              state [i] [j] = random() &gt; (RAND_MAX/2) ? 1 : 0 ;
+          }
+      }
+  
+      // Main update loop.
+  
+      for(int iter = 0 ; iter &lt; NITER ; iter++) {
+  
+          printf("iter = %d\n", iter++) ;
+  
+          // Calculate neighbour sums.
+  
+          #pragma omp parallel for
+          for(int i = 0 ; i &lt; N ; i++) {
+              for(int j = 0 ; j &lt; N ; j++) {
+  
+                  // find neighbours...
+                  int ip = (i + 1) % N ;
+                  int im = (i - 1 + N) % N ;
+                  int jp = (j + 1) % N ;
+                  int jm = (j - 1 + N) % N ;
+  
+                  sums [i] [j] =
+                       state [im] [jm] + state [im] [ j] + state [im] [jp] +
+                       state [ i] [jm]                   + state [ i] [jp] +
+                       state [ip] [jm] + state [ip] [ j] + state [ip] [jp] ;
+              }
+          }
+  
+          // Update state of board values.
+      
+          #pragma omp parallel for
+          for(int i = 0 ; i &lt; N ; i++) {
+              for(int j = 0 ; j &lt; N ; j++) {
+                  switch (sums [i] [j]) {
+                      case 2 : break;
+                      case 3 : state [i] [j] = 1; break;
+                      default: state [i] [j] = 0; break;
+                  }
+              }
+          }
+  
+          printCells() ;
+      }
+  }
+  
+  void printCells() {
+      for(int i = 0 ; i &lt; N ; i++) {
+          for(int j = 0 ; j &lt; N ; j++) {
+              if(state [i] [j])
+                  printf(" o") ;
+              else
+                  printf("  ") ;
+          }
+          printf("\n") ;
+      }
+  }
+</pre>
+This is a fully parallelized OpenMP version of "Life".  Apart from the
+cruder output (I didn't want to get bogged down in C++ graphics) it should
+look very much like the sequential Life code we saw last week.
+The parallelization is encapsulated in just the <tt>omp</tt> pragmas in
+front of the computational loops.
+<p></p>
+
+<p>
+Open a terminal (Linux equivalent of Command Prompt) and compile and run
+this program by:
+</p><pre>  $ gcc -fopenmp life.cc
+  $ ./a.out
+</pre>
+(<i>Don't</i> type the <tt>$</tt> - that is just my representation of
+the command prompt!)<p></p>
+
+<p>
+Increase <tt>N</tt> and <tt>NITER</tt> to something more realistic (e.g.
+1024 and 1000), comment out the output call <tt>printCells()</tt>,
+and try some benchmarking.
+You may for example use the <tt>time</tt> command in Linux to time
+runs, e.g.:
+</p><pre>  $ time ./a.out
+</pre>
+The time to record is the "real" time output by the <tt>time</tt> command.
+<p></p>
+<p>
+To change the number of threads, issue a command such as:
+</p><pre>  $ export OMP_NUM_THREADS=2
+</pre>
+before running the program.<p></p>
+
+<p>
+To make a sequential program for calculating parallel speedups, either
+comment out the two <tt>#pragma omp</tt> lines, or just set the
+<tt>OMP_NUM_THREADS</tt> environment variable to 1.</p>
+
+</div>
+
+<div id="footer">
+Copyright © University of Portsmouth, 2020
+</div>
+
+
+
+
+</div></body><grammarly-desktop-integration data-grammarly-shadow-root="true"><template shadowrootmode="open"><style>
+  div.grammarly-desktop-integration {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+    -moz-user-select: none;
+    -webkit-user-select: none;
+    -ms-user-select:none;
+    user-select:none;
+  }
+
+  div.grammarly-desktop-integration:before {
+    content: attr(data-content);
+  }
+</style><div aria-label="grammarly-integration" role="group" tabindex="-1" class="grammarly-desktop-integration" data-content="{&quot;mode&quot;:&quot;full&quot;,&quot;isActive&quot;:true,&quot;isUserDisabled&quot;:false}"></div></template></grammarly-desktop-integration></html>

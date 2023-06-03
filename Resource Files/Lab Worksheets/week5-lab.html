@@ -1,0 +1,550 @@
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<link href="./week5-lab_files/mystyle.css" rel="stylesheet" type="text/css">
+</head>
+
+<body style="" data-new-gr-c-s-check-loaded="14.1111.0" data-gr-ext-installed="">
+
+<div id="container">
+
+<div id="header">
+<h1>Parallel Programming Lab, Week 5:<br>Running MPJ Programs</h1>
+
+</div>
+
+<div id="content">
+
+<p>
+<a href="http://mpj-express.org/"><i>MPJ Express</i></a> is piece of software
+that provides MPI-like functionality for Java.  Over the next few labs,
+you will be invited to use this software to gain experience of
+MPI-style parallel programming on small clusters of workstations.</p>
+
+<p>
+In previous labs we ran parallel programs within the multiple cores of
+a single workstation.  Now we will try to bring together several
+computers to work together on parts of a single problem.</p>
+
+<p>
+Undoubtedly, this kind of <i>distributed memory</i> parallel programming
+is a tougher proposition than shared memory programming.  Most likely
+you can expect some hiccups in getting MPJ Express programs running in
+your environment.  Please persevere!</p>
+
+<h2>Special instructions - The Hadoop cluster</h2>
+
+<p>
+To run MPJ applications, there are two main options: (i) installing MPJ Expresss under your accounts on
+the teaching lab computers (may not be possible because of the recent university security measures) or on your local machines, 
+(ii) working on a resource managed by the School of Computing called
+<i>The Hadoop Cluster</i>.</p><p> In this tutorial we will go for the second option because of being more convenient. 
+
+</p><p>
+There is a general tutorial on using the Hadoop cluster <a href="Resource Files\Lab Worksheets\cluster-tutorial.html">here</a>, covering access to the cluster, and discussing the accounts
+that will be created for you there.  Please read this tutorial at least
+far enough that you are able to open one or more remote terminals on
+selected nodes of the cluster.</p>
+
+<p>
+We won't be using Hadoop for now, but MPJ Express is preinstalled on
+this cluster, so you won't need to install it in your own accounts.</p>
+
+<!--
+<h2>Installing MPJ Express</h2>
+
+<p>
+Various versions of the MPJ Express software can be downloaded through
+the link given above.  But for this unit we have prepared a
+custom version of the software.  Please use this <i>and
+only this</i> version on the PCs in the labs!  You may also
+use this version at home or elsewhere if you wish.</p>
+
+<p>
+Download the Zip archive <tt>mpj-v0_35P03.zip</tt> from the Moodle site,
+and <i>extract it to the top level of your N: drive</i>.  In other words,
+if you are using the extract facility built in to Windows, you should set
+the field "Files will be extracted to this folder:" to <tt>N:\</tt>.</p>
+
+<p>
+In the past we have sometimes had problems extracting this archive to
+the N: drive using the built-in extraction facilities in Windows 7 - folders were trunctated and only
+contained a fraction of the files from the archive. 
+Check that the extracted folder <tt>N:\mpj-v0_35P03</tt> contains <i>no
+nested folder of the same name</i>, that it contains about 14MB of data,
+and that it contains about 668 files.  If these are all true, you can safely
+proceed to the next step.  If there appears to be any problem,
+I suggest instead you install 7-Zip from MyApps and use that.
+Make sure the "Extract to" field is set to just <tt>N:\</tt>.</p>
+
+<p>
+
+<p>
+Unzipping should create a folder:
+<pre>
+  N:\mpj-v0_35P03
+</pre>
+There is some documentation for the system in the sub-folder
+<tt>mpj-v0_35P03\doc</tt>, but for installation and configuration
+matters you should follow the instructions in these lab scripts -
+<i>not</i> what you read there!</p>
+
+
+<p>
+A useful resource is the draft document <i>Parallel Programming
+with Java</i>, by Aamir Shafi.  You may find this slightly intimidating
+to begin with, but if you want to get into the details of MPI-like
+programming with Java it is an excellent source.</p>
+
+</p>
+
+<h2>Compiling an MPJ Program</h2>
+
+<!--
+<p>
+It turns out that you won't be able to <i>run</i> MPJ programs from
+NetBeans.  Instead we give instructions below for running MPJ programs
+from the Windows Command Prompt.  But we will use NetBeans for the important
+stages of editting and compiling the programs (compilation you will recall
+turns a Java source program into a set of <i>class files</i> containing
+Java <i>byte code</i>).</p>
+
+<p>
+Because we are using NetBeans for building and Command Prompt for running,
+I suggest you follow the instruction here rather closely, even if they 
+differ from your usual practices (or even my usual advice) on how to use
+NetBeans.  Otherwise instructions in the next section may need significant
+tweaking.</p>
+
+<p>
+First, in NetBeans, create a Java application project called
+<tt>MPJExamples</tt>.  I am going to suggest that you put <i>all</i>
+the MPJ code you develop in these labs in this project.  But the first
+example will be called <tt>HelloWorld</tt>, so when you create the
+project, in the "Create Main Class" box put just <tt>HelloWorld</tt>,
+<i>with no package name prefix</i>.  In other words, we will create this
+and subsequent MPJ applications in the default package.</p>
+-->
+
+<p>
+On the cluster we won't be using NetBeans or any similar IDE to build
+our programs - we will just revert to command line tools.</p>
+
+<p>
+Open a terminal on the cluster.  Then using for example the nano editor:
+</p><pre>  $ nano HelloWorld.java
+</pre>
+create a <tt>HelloWorld.java</tt> source file, containing this program text:
+<pre>  import mpi.* ;
+
+  public class HelloWorld {
+
+      public static void main(String args[]) throws Exception {
+          MPI.Init(args) ;
+          int me = MPI.COMM_WORLD.Rank() ;
+          int size = MPI.COMM_WORLD.Size() ;
+          System.out.println("Hi from &lt;" + me + "&gt;") ;
+          MPI.Finalize() ;
+      }
+  }
+</pre><p></p>
+Now try to compile it by this command:
+<pre>  $ javac HelloWorld.java
+</pre>
+<p></p>
+<!--
+NetBeans won't initially recognize the MPI-specific imports and library
+methods here.  What you need to do is right click on <tt>MPJExamples</tt>
+folder in the Projects panel, and select Properties.  Then
+open Libraries, and while in the Compile tab click "Add JAR/Folder".</p>
+
+<p>In the file browser that pops up, navigate to <tt>N:\mpj-v0_35P03\lib</tt>
+and select the <tt>mpj.jar</tt> archive (<i>not</i> the <tt>mpi.jar</tt>
+archive!)</p>
+
+<p>
+Netbeans should now recognize the MPI symbols in your HelloWorld program.</p>
+
+<p>
+<i>Don't</i> try to run the program!  It won't work.  Instead right
+click on <tt>HelloWorld.java</tt> file in the Projects panel and
+click "Compile File".</p>
+-->
+
+
+<p>
+If this succeeds you have successfully compiled your progam and we are
+ready to move to the next section.  <!-- Occasionally I found the "Compile File"
+menu item was greyed out.  If that happens try to clicking on the
+save icon near the top of the NetBeans Window (it looks like two diskettes).
+Files are usually compiled by default when the are saved, so this may do
+the trick.--></p>
+
+<h2>Running Programs in "Multicore" mode</h2>
+
+<!--
+<p>
+Start a Command Prompt from the Windows Start menu (e.g. search for the
+program <tt>cmd</tt> and execute it).</p>
+
+<p>
+We will start a few Command Prompt windows in the course of this
+week's lab.  Whenever you start one you should
+execute the following four commands in this Command Prompt
+to set up your Java and MPJ environment:
+<pre>
+  set MPJ_HOME=N:\mpj-v0_35P03
+  set PATH=%MPJ_HOME%\bin;%PATH%
+  set CLASSPATH=.;%MPJ_HOME%\lib\mpj.jar
+  set PATH=C:\Program Files (x86)\Java\jre1.8.0_161\bin;%PATH%
+</pre>
+To avoid errors, I recommend you just copy the above four lines as a
+group and paste them into your Command Prompt.  <i>Get into the habit of
+doing this every time you start a new Command Prompt</i>.  I know
+this is tiresome; next week I will suggest a convenient batch file
+to alleviate this tedium.
+</p>
+
+<p>
+The class files you generated with NetBeans are likely to be on
+your <tt>N:</tt> drive, unless you configured NetBeans to put your project
+directories anywhere else.  To go to N-drive, type just:
+<pre>
+  N:
+</pre>
+at the command prompt, and hit return.  Now use the <tt>cd</tt> command
+to enter the folder containing the <tt>MPJExamples</tt> project
+folder, e.g.:
+<pre>
+  cd MPJExamples
+</pre>
+Further change folder down to the nested <tt>build\classes</tt>
+folder:
+<pre>
+  cd build\classes
+</pre>
+You should find the class file you created earlier in here - use the
+<tt>dir</tt> command to check.</p>
+
+<p>If you follow my advice, you will run all your MPJ examples from
+within this <tt>classes</tt> folder.</p>
+-->
+
+<p>
+MPJ Express has two modes of operation.  The mode we are really interested
+in - running MPI processes across different workstations - is called
+<i>cluster mode</i>.  The other mode, which is easier for initial testing,
+is called <i>multicore mode</i>.</p>
+
+<p>
+In multicore mode, the MPI processes just run on the cores of the local
+processor (technically speaking these "processes" are run as threads, but
+the software uses some tricks with the Java Virtual Machine to isolate
+these threads so they don't share access to any common data).</p>
+
+<p>
+To make things easier initially, multicore mode is actually the
+<i>default</i> mode of operation for MPJ Express.</p>
+
+<p>
+The program that starts an MPJ Express application is called
+<tt>mpjrun</tt>.  To start the HelloWorld application we created earlier
+using two "processes" in multicore mode, assuming you are in directory
+containing the ".class" file created by javac, type:
+</p><pre>  $ mpjrun.sh -np 2 HelloWorld
+</pre>
+Try this also with 1, 4 and many threads.<p></p>
+
+<!--
+<p>(If you didn't follow my advice, and did <i>not</i> put HelloWorld in the
+default package, the command will be something like:
+<pre>
+  mpjrun -np 2 mypackage.HelloWorld
+</pre>
+where <tt>mypackage</tt> is the package name.)</p>
+-->
+
+<h2>Starting an MPJ Program in "Cluster Mode"</h2>
+
+<p>
+For this you need two or more nodes on which you will run your
+MPJ program.  Before you can start running MPJ programs, there needs
+to be a service running on each of these nodes called
+the <i>MPJ Daemon</i> (see slides 21 to 23 of the week 4 lecture).</p>
+
+<p>
+For now the preferred way of achieving this is to organize yourselves into
+loose groups of students, and each of you (or a chosen subset of you)
+starts an MPJ Daemon on
+one node of the cluster.  This creates a mini-cluster, and then all students
+in the group can run parallel programs across that cluster.</p>
+
+<p>
+There's no particular reason why you cannot start daemons on
+multiple nodes by yourself, but be aware that only one daemon can run per node -
+you may need some ad hoc strategy to avoid nodes being used by other
+students or groups.  You will need to run multiple remote terminals from
+your home computer concurrently.</p>
+
+<p>
+To run an MPJ Daemon service, launch a <i>new</i> remote shell to the
+cluster, login, then ssh to the selected node (which preferably should
+<i>not</i> be the head node mn01.soc).  Now run the command:
+</p><pre>  $ mpjdaemon.sh
+</pre>
+in your remote terminal.  It won't initially appear do anything - it is just
+waiting for requests from the client mpjrun.<p></p>
+
+<p>
+Unless anything goes wrong, you should be able to just start this command
+running in its dedicated terminal at the start of your practical session
+or peroid of work at home, and leave it there until the end of your session
+(please don't leave it running indefinitely, unattended).  In the mean
+time this node is available as a resource on which processes of an MPJ
+Express parallel program can be run.</p>
+
+<p>
+In general it shouldn't matter if more than one MPJ program is being
+run in a local daemon at the same time.  But when you are running
+final <i>benchmark</i> programs you <i>may</i> have to negotiate with other
+students in your group to make sure they aren't running other MPJ programs
+at the same time - otherwise your timings may not be representative!</p>
+
+<p>
+The <tt>mpjrun.sh</tt> program now acts as a client that communicates with
+the available pool of MPJ Daemons, and requests they initiate jobs.
+You tell the <tt>mpjrun</tt> program <i>which</i> daemons to use by
+putting the IP addresses of the PCs running them in a file called <tt>machines</tt> in your
+<i>current working directory</i> (typically the directory where the class
+file(s) live).
+The <tt>machines</tt> file is a <i>text file</i>, but note it has no file extension -
+<tt>machines</tt> is the complete file name.  If you put "<tt>.txt</tt>"
+on the end, <tt>mpjrun</tt> will not be able to read it!</p>
+<!--
+  If you are
+looking for a suitable text editor to create this file, Atom, available
+through MyApps, seems to be a popular choice.</p>-->
+
+
+<p>
+The content of <tt>machines</tt> should just be a list of host names or
+IP addresses on separate lines, e.g.:
+</p><pre>  wn01.soc
+  wn02.soc
+</pre>
+Each member of a group starting the daemon on some host should share their
+host names everyone else, so each can put them in their <tt>machines</tt>
+file.<p></p>
+
+<p>
+Assuming the daemons have been started, and the <tt>machines</tt> file
+exists in the working folder, you should generally be able to run the
+something like the following command:
+</p><pre>  $ mpjrun.sh -np 2 -dev niodev HelloWorld
+</pre>
+in you original terminal. You should add the command line arguments:
+<pre>  -dev niodev
+</pre>
+to <tt>mpjrun</tt> every time you want to run an MPJ program in cluster mode.
+These arguments select the underlying communication "device".  The "nio" here
+refers to Java NIO, which is the socket API used to communicate between
+the hosts.<p></p>
+
+<p>
+Unfortunately, if you run mpjrun from the head node, mn01.soc, of our cluster
+(which is generally recommended) the command above won't work.
+The problem is that in our case the head node has <i>two</i> network
+interfaces - one outward facing to the Internet and one inward facing to
+the rest of the cluster.  To make sure the mpjrun client sends the right
+address of its host to the daemons, you have to add an extra argument
+like this:
+</p><pre>  $ mpjrun.sh -np 2 -dev niodev -headnodeip mn01.soc HelloWorld
+</pre>
+If successful, this command tells you where the various processes are
+running, then displays the output of the program.<p></p>
+
+<p>
+Again run the program using various numbers of processes.  What happens
+if you request more processes than you have machines in the machines file?</p>
+<!--
+For interpretation of the results, it may help to run the command:
+<pre>
+  hostname
+</pre>
+on the computers involved.</p>
+-->
+
+
+<h2>Distributed Calculation of <i>π</i></h2>
+
+<p>In the week 1 lab you should have run this sequential program to calculate
+<i>π</i>:
+</p><pre>  public class SequentialPi {
+
+      public static void main(String[] args) {
+
+          long startTime = System.currentTimeMillis();
+
+          int numSteps = 100000000;
+
+          double step = 1.0 / (double) numSteps;
+
+          double sum = 0.0;
+
+          for(int i = 0 ; i &lt; numSteps ; i++){
+              double x = (i + 0.5) * step ;
+              sum += 4.0 / (1.0 + x * x);
+          }
+
+          double pi = step * sum ;
+
+          long endTime = System.currentTimeMillis();
+
+          System.out.println("Value of pi: " + pi);
+
+          System.out.println("Calculated in " +
+                             (endTime - startTime) + " milliseconds");
+      }
+  }
+</pre>
+(I have deliberately increased <tt>N</tt> to a hundred million, otherwise
+timings will be too short).  Compile and run this now, and note how long
+it takes.  Then make a file in the default package called
+<tt>MPJPi.java</tt> containing the following program:
+<pre>  import mpi.* ;
+
+  public class MPJPi {
+
+    final static int N = 100000000 ;
+
+    public static void main(String args[]) throws Exception {
+      MPI.Init(args) ;
+
+      long startTime = System.currentTimeMillis();
+
+      int me = MPI.COMM_WORLD.Rank() ;
+      int P = MPI.COMM_WORLD.Size() ;
+
+      int b = N / P ;
+      int begin = me * b ;
+      int end = begin + b ;
+
+      double step = 1.0 / (double) N ;
+
+      double sum = 0.0 ;
+
+      for(int i = begin ; i &lt; end ; i++){
+        double x = (i + 0.5) * step ;
+        sum += 4.0 / (1.0 + x * x);
+      }
+
+      if(me &gt; 0) {
+        double [] sendBuf = new double [] {sum} ;  // 1-element array containing sum
+        MPI.COMM_WORLD.Send(sendBuf, 0, 1, MPI.DOUBLE, 0, 0) ;
+      }
+      else {
+        double [] recvBuf = new double [1] ;
+        for(int src = 1 ; src &lt; P ; src++) {
+          MPI.COMM_WORLD.Recv(recvBuf, 0, 1, MPI.DOUBLE, src, 0) ;
+          sum += recvBuf [0] ;
+        }
+      }
+
+      double pi = step * sum ;
+
+      long endTime = System.currentTimeMillis();
+
+      if(me == 0) {
+        System.out.println("Value of pi: " + pi);
+        System.out.println("Calculated in " +
+                           (endTime - startTime) + " milliseconds");
+      }
+
+      MPI.Finalize() ;
+    }
+  }
+</pre>
+This program is described towards the end of the week 4 lecture.<p></p>
+
+<p></p>
+Now compile it by this command:
+<pre>  $ javac MPJPi.java
+</pre>
+<p></p>
+
+<p>
+Run it by, for example:
+</p><pre>  $ mpjrun.sh -np 2 -dev niodev -headnodeip mn01.soc MPJPi
+</pre>
+Do you get a parallel speedup?<p></p>
+
+<h2>Exercise</h2>
+
+<p>
+Experiment with various numbers of nodes in multicore and cluster mode.
+What is the largest parallel speedup you can get:
+</p><ol>
+<li>
+in multicore mode</li>
+<li>
+in cluster mode</li>
+</ol>
+The nodes in the cluster have 12 cores, but you may have trouble running
+this many threads in MPJ multicore mode.<p></p>
+
+<p>
+To get substantial parallel speedups on this relatively small problem
+we <i>may</i> have to cheat slightly to increase the workload.  Increase
+<tt>N</tt> to one billion (1000000000).  Then try running the program with
+different numbers of processes.</p>
+
+<p>Note you can have <i>more</i> MPJ processes than the
+available number of hosts - the multiple cores of the hosts should contribute
+to additional parallel speedup.</p>
+
+<!--
+<p>
+<i>Note on Java Virtual Machines in the labs:</i> NetBeans uses the <tt>java</tt> command
+from the <i>Java Development Kit</i> (JDK) to run Java programs.  When you run
+MPJ programs from the Command Prompt above you are however indirectly using the
+<tt>java</tt> command from the <i>Java Runtime Environment</i> (JRE), because
+we don't have a standalone installation of JDK on the lab Windows machines.  Unfortunately the
+JRE version of <tt>java</tt> is slower (it uses a different JVM by default).
+For a fair comparison, I recommend you compile the <tt>SequentialPi</tt> program
+in NetBeans, but run it from the Command Prompt: navigate to the
+<tt>classes</tt> folder for the sequential pi project, and run something
+like:
+<pre>
+  java sequentialpi.SequentialPi
+</pre>
+-->
+<p></p>
+
+</div>
+
+<div id="footer">
+Copyright © University of Portsmouth, 2020
+</div>
+
+
+
+
+</div></body><grammarly-desktop-integration data-grammarly-shadow-root="true"><template shadowrootmode="open"><style>
+  div.grammarly-desktop-integration {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+    -moz-user-select: none;
+    -webkit-user-select: none;
+    -ms-user-select:none;
+    user-select:none;
+  }
+
+  div.grammarly-desktop-integration:before {
+    content: attr(data-content);
+  }
+</style><div aria-label="grammarly-integration" role="group" tabindex="-1" class="grammarly-desktop-integration" data-content="{&quot;mode&quot;:&quot;full&quot;,&quot;isActive&quot;:true,&quot;isUserDisabled&quot;:false}"></div></template></grammarly-desktop-integration></html>

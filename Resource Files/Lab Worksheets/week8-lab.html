@@ -1,0 +1,329 @@
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<link href="./week8-lab_files/mystyle.css" rel="stylesheet" type="text/css">
+</head>
+
+<body style="" data-new-gr-c-s-check-loaded="14.1111.0" data-gr-ext-installed="">
+
+<div id="container">
+
+<div id="header">
+<h1>Parallel Programming Lab, Week 8:<br>Starting your Development Project</h1>
+
+</div>
+
+<div id="content">
+
+<p>
+The emphasis in labs for the remainder of the term is on
+your own <i>development project</i> involving parallel programming.
+There are likely to be one or two more short, "scripted" labs this term,
+but those will be mainly to provide extra skills for the project work.
+</p>
+
+<p>
+This week you should start thinking about what you want to do for
+your project.
+What follows below is a short list of possible projects, or
+at least starting points for these projects.  Some of these ideas
+are concerned primarily with exploring different kinds of software
+infrastructure to support parallel programming, and some take the form of
+specific applications that you can try to parallelize.  You can mix and
+match between the two different types of project.  You are also strongly
+encouraged to consider <i>different</i> applications, or to use different
+programming frameworks you may have access to - e.g. Cilk, Intel Threaded
+Building Blocks, task farms using Web Sockets (??), etc.  But please discuss
+these applications or technologies with me, before starting.</p>
+
+<p>
+In all cases, your report on the project, which forms a major part of
+the lab book assessment,
+should include extensive benchmarking and analysis of parallel speedup and
+efficiencies obtained for different numbers of cores and different problem
+sizes - preferably as tables and graphs.</p>
+
+<h2>Some Project Ideas</h2>
+
+<ul>
+<li>
+Apply the OpenMP framework for shared memory parallel programming to a
+selection of the examples introduced in earlier lectures
+and labs, or to examples given below.  If you have experience using C or C++
+you can convert the examples to one of those languages and use the
+GNU C/C++ compiler under CentOS, as described at the end of the Week 4 lab
+(or any other version of Linux, or Windows if you have access to a suitable compiler that supports OpenMP).<p></p>
+
+<!--
+<p>
+If you prefer to use Java there is an experimental Java binding of OpenMP
+from Edinburgh Parallel Computing Centre available from:
+<pre>
+  <a href="https://www.epcc.ed.ac.uk/research/computing/performance-characterisation-and-benchmarking/jomp">https://www.epcc.ed.ac.uk/research/computing/performance-characterisation-and-benchmarking/jomp</a>
+</pre>
+You should be able to install the jar file somewhere on your N: drive and
+adjust your CLASSPATH environment variable accordingly, then follow the
+instructions on the Web page above.  But be prepared to work around limitations and "features" in the implementation.</p>
+-->
+</li>
+<li>
+<p>
+Undertake a systematic benchmarking of MPJ Express communication
+primitives in the teaching lab environment.  The basic tool would probably
+be an MPJ <i>ping-pong</i> benchmark program you would write, in which one process sends a
+message to another, and that process reflects it back.  The round trip
+time is measured and halved to give the basic <i>message latency</i>.
+This is repeated for a range of message sizes from one byte to megabytes
+to find the <i>message bandwidth</i>.  Try this between a range of PCs
+in the same labs, different teaching labs, and with connections to wireless
+laptops, computers at home, and so on.</p>
+<p>
+Relate your findings to parallel speed-ups obtained in full MPJ programs
+like the Laplace solver and task farm explored in earlier labs - try
+to give a model or formula for their performance.</p>
+</li>
+<li>
+<p>If you have access to a system with an appropriate GPU card, and you
+are willing to program in C or C++, try to apply CUDA or OpenCL to one or more
+computational applications - either applications encountered in these labs
+or other suitable applications discussed with the tutor (there are
+also GPU systems in the department - ask me if you need access to these).</p>
+<p>Compare your results to parallel and sequential programs running on
+multicore CPUs.</p>
+<p>
+If you are interested in trying GPU programming from Java rather than C/C++,
+there <i>are</i> frameworks that make this possible.  You may, for example,
+look at <a href="https://code.google.com/p/aparapi/">Aparapi</a>.
+I will talk about this in this week's lecture.</p>
+</li>
+<li>
+<p>Here is a <a href="Resource Files\Lab Worksheets\Week 8 Codes\RayTracer.java">simple Java program for raytracing</a>,
+adapted from a C++ program from <a href="http://www.scratchapixel.com/">Scratchapixel</a>.
+It only deals with scenes containing spheres, but produces quite striking
+results.</p><p>
+
+</p><p>
+Experiment with parallelizing the Java version of this program using
+Java threads and also an MPJ Express taskfarm (the C++ could
+alternatively be parallelized using OpenMP - see above).  The main
+loops that will be parallelized are in the <tt>render()</tt> method.
+Expect load-balancing to be an issue.</p>
+<p>
+If you need to make the problem more computationally demanding, and thus more suitable to exploit parallelism, you can adapt the original version of this program.  
+You should be able to increase the image size, add many more spheres (dozens or hundreds, perhaps?)  Because
+the generated image suffers quite noticeably from "aliasing", you might
+want to add
+<a href="http://en.wikipedia.org/wiki/Supersample_anti-aliasing">supersampling</a>,
+which may also greatly increase the number of computations.</p>
+</li>
+<li>
+<p>
+Here is a <a href="Resource Files\Lab Worksheets\Week 8 Codes\MD.java">simple molecular dynamics program in Java</a>,
+adapted from an
+<a href="http://physics.weber.edu/schroeder/software/mdapplet.html">applet
+by Dan Schroeder</a>.  It simulates a two dimensional system of atoms, and
+exhibits phases that look very like solids, liquids and gases - try adjusting
+the <tt>VELOCITY</tt> constant which effectively changes the temperature
+of the system.</p>
+<p>
+Try to parallelize this by using Java threads, decomposing the main loops
+over particles in a way similar to problems we have considered in earlier
+labs.  Also try to
+parallelize it using MPJ by dividing the particle arrays over processes.</p>
+<p>
+It may be challenging to achieve good parallel speedup in the distributed
+memory case because the calculation of accelerations requires positions
+of all particles to be broadcast in every iteration.
+<a href="https://en.wikipedia.org/wiki/Cell_lists">Cell lists</a>
+provide a better organization - try to understand why, even if you don't
+have time to implement this approach.</p>
+</li>
+
+<li>
+<p>
+In a similar vein, here is a <a href="Resource Files\Lab Worksheets\Week 8 Codes\Gravity.java">simple program that
+simulates motion of stars in a galaxy</a> using Newton's laws.
+I don't really expect you to get
+any beautiful spiral galaxies, but at least you should produce some
+"elliptical clusters"!</p>
+
+<p>
+Try to parallelize this, as discussed above in the molecular dynamics
+project (the structure of the program is very similar).</p>
+
+<p>
+(Nothing to do with parallelism, but it might be useful to adapt the
+program so that it displays two different
+windows - one with a view from "above" (x-y plane) and one from the side
+(x-z plane)...)</p>
+</li>
+
+<p>
+In the sample program I used the naive algorithm for the
+"<i>N</i>-body problem", which involves O(<i>N</i><sup>2</sup>)
+force calculations in every update (one inverse-square law for each
+star pair).  This at least increases your chance of getting parallel
+speed-up for large enough <i>N</i>.  Real large scale simulations of
+galaxies and the universe often use some variation on the theme of <a href="http://en.wikipedia.org/wiki/Barnes%E2%80%93Hut_simulation">Barnes
+Hut Simulation</a>. The Barnes-Hut scheme will be briefly discussed in the
+week 9 lecture, and there is a sequential Barnes-Hut code available
+<a href="Resource Files\Lab Worksheets\Week 8 Codes\BarnesHut.java">here</a>.  You may alternatively wish to
+try to parallelize this code for your project.</p>
+
+<li>
+<p>
+Write some basic matrix arithmetic operations in Java (or another language),
+and try to parallelize them using Java threads or MPJ Express
+(or any other approach).</p>
+<p>
+You should be able to make a parallel version of matrix multiplication, at
+least, that achieves good parallel speedups.  Generate two random matrices
+of size <i>N</i> by filling them with random numbers, and multiply them
+together by parallel and sequential algorithms.  For testing, make sure
+your program
+compares the result of the parallel algorithm with the (presumably correct)
+result of the sequential version, element by element.  Compare timings
+of both algorithms for parallel speedup.</p>
+<p>
+For a bigger challenge, try to make a parallel version of solution of
+linear equations by the <a href="http://en.wikipedia.org/wiki/LU_decomposition">LU decompostion</a>
+method.  (As discussed in the week 1 lecture, this is the basis of the
+Linpack benchmark used in the TOP500 list.)  To simplify, don't worry
+too much about "pivotting".</p>
+<p></p>
+</li>
+<li>
+<p>
+Write a parallel version of a simple prime number sieve.  To test a number
+<i>n</i> for primeness, just try dividing it by all numbers from 2 to
+sqrt(<i>n</i>).  A fairly naive sieve tests all numbers from 2 to <i>N</i> in this
+way and returns a list of all prime numbers in this range.</p>
+<p>
+This problem is suitable for implementing as an MPJ task farm.
+As a single task, the master sends a subrange of numbers to a worker (just
+a start value and end value for the range will do).
+The worker tests them for primality, and returns a list (array) of
+prime numbers.  The master should concatenate all the lists together
+and output them as one long list, in the right order,
+at the end of the run
+(you don't need include the final output stage in your timing).</p>
+<p>
+Can you achieve a parallel speedups?  For large enough <i>N</i> it should
+be possible. (If you generate enough prime numbers, maybe you can
+<a href="http://www.prime-numbers.org/">sell them</a>...)</p>
+<p>
+A more efficicent algorithm is the classical Sieve of Eratosthenes.
+Can you parallelize this algorithm?</p>
+</li>
+<li>
+<p>There are numerous variations possible on problems considered in
+earlier labs - calculating variants of the Mandelbrot Set like
+the <a href="http://en.wikipedia.org/wiki/Julia_set">Julia Set</a>,
+simulating cellular automata other than Life like
+<a href="http://en.wikipedia.org/wiki/Brian%27s_Brain">Brian's Brain</a>,
+solving the three-dimensional Laplace Equation rather
+than the two-dimensional Laplace Equation, and so on.</p>
+<p>
+If you are going to attempt such variations, make
+sure you do a thorough study of the parallelization.  For
+novelty you might, for example, try decompositions using square blocks
+rather than the simple whole-row or whole-column decompositions we have
+typically used in earlier labs, or to introduce the use of MPI collective
+communications.</p>
+</li>
+<li>
+<p>
+(For the more adventurous) investigate the feasibility of parallel
+Bitcoin mining.  It is almost certainly impractical for you to
+implement a real Bitcoin node, but the central "proof-of-work"
+algorithm that earns miners new bitcoins is a search problem that
+involves finding a nonce (essentially a random number) whose inclusion
+in some given data structure ("block") leads to a SHA-256 hash value
+for the block less than some threshold (there is a good explanation <a href="http://www.michaelnielsen.org/ddi/how-the-bitcoin-protocol-actually-works/">here</a> - you will have to research the relevant issues).</p>
+<p>
+You could investigate parallelizing a similar search problem with
+a farm or a GPU, say.</p>
+</li>
+<li>
+<p>
+In recent years a number of open source parallel or distributed computation frameworks
+have been developed specifically to support processing of so-called "Big Data".
+Examples include:</p>
+<ul>
+<li>
+Apache Hadoop with its Map-Reduce parallel programming paradigm.
+</li>
+<li>
+Apache Spark is a general computation engine for big data, with many associated libraries.
+</li>
+<li>
+Apache Giraph for processing large graph-oriented data structures.
+</li>
+</ul>
+<p>
+The school has a cluster dedicated to teaching and research on these
+technologies.  If you want to do a project using Hadoop or Spark in particular,
+I can provide an account on this cluster, where these frameworks are already
+installed.
+You could for example evaluate the parallelism built into Spark machine
+learning libraries, or try to use Hadoop or Spark to parallelize some simple
+algorithms like as the ones we have considered earlier.
+</p></li>
+</ul>
+In a related previous module, there were many interesting
+development projects over several years -
+either variations on themes above or completely original.
+For your further inspiration, here are a few examples:
+<ul>
+<li>
+Parallel prime sieve using Java Fork/Join framework.</li>
+<li>
+Julia Set computation distributed across Web browsers using Web Sockets.</li>
+<li>
+Parallel edge detection (image processing).</li>
+<li>
+Parallelization of matrix multiplication by AparAPI and other approaches.</li>
+<li>
+Simulation of cardiac tissue on GPUs using CUDA.</li>
+<li>
+Parallel computation of pi digits by <a href="http://en.wikipedia.org/wiki/Bailey%E2%80%93Borwein%E2%80%93Plouffe_formula">BBP</a> and other methods.</li>
+<li>
+Parallelisation of a genetic algorithm.</li>
+<li>
+Parallel prime sieve using a GPU.</li>
+<li>
+"Galaxy" simulation on a GPU using AparAPI.</li>
+<li>
+Parallel solution of wave equations in one and two dimensions.</li>
+<li>
+File transfer using MPJ.</li>
+</ul>
+
+</div>
+
+<div id="footer">
+Copyright © University of Portsmouth, 2019
+</div>
+
+
+
+
+</div></body><grammarly-desktop-integration data-grammarly-shadow-root="true"><template shadowrootmode="open"><style>
+  div.grammarly-desktop-integration {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+    -moz-user-select: none;
+    -webkit-user-select: none;
+    -ms-user-select:none;
+    user-select:none;
+  }
+
+  div.grammarly-desktop-integration:before {
+    content: attr(data-content);
+  }
+</style><div aria-label="grammarly-integration" role="group" tabindex="-1" class="grammarly-desktop-integration" data-content="{&quot;mode&quot;:&quot;full&quot;,&quot;isActive&quot;:true,&quot;isUserDisabled&quot;:false}"></div></template></grammarly-desktop-integration></html>

@@ -1,0 +1,683 @@
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<link href="./cluster-tutorial_files/mystyle.css" rel="stylesheet" type="text/css">
+</head>
+
+<body style="" data-new-gr-c-s-check-loaded="14.1111.0" data-gr-ext-installed="">
+
+<div id="container">
+
+<div id="header">
+<h1>Using the Hadoop Cluster</h1>
+
+</div>
+
+<div id="content">
+
+<p>
+School of Computing Hadoop Cluster is
+a collection of computers on which you can run data analytics jobs.
+This week you will log in to the Cluster, and start to explore it.
+</p>
+
+<h2>Logging in to the Cluster</h2>
+
+<p>
+It is possible to log in to the cluster through a Web browser using a
+Jupyter Hub, and we may do this in some later labs.  But for now I
+recommend you just use an ssh client - e.g PuTTY on Windows.
+</p>
+
+<p>
+Click on the AppsAnywhere icon on the desktop, wait for validation to
+succeed, then search for PuTTY.  Launch PuTTY.
+</p>
+
+<p>
+In the PuTTY configuration window, set the Host Name to:
+</p><pre>    mn01.soc.uni.ds.port.ac.uk
+</pre>
+and click Open.  If successful, the PuTTY configuration window will be
+replaced by a terminal window (similar to a Command Prompt in Windows),
+prompting for Linux login.
+<p></p>
+
+<p>
+If you are working from home or anywhere outside the University network,
+you should first install and start the <a href="https://kb.myport.ac.uk/Article/Index/12/4?id=2504">VPN client</a>.  You may also need to install PuTTY
+from <a href="https://www.putty.org/">www.putty.org</a><a></a></p><a>
+
+<p>
+For future convenience you may want to "save a session" in the PuTTY
+configuration, <i>before</i> clicking Open.  Under "Saved Sessions"
+type a short, memorable name like "mn01" then click "Save".  In future
+you can just click on the
+short name, then "Open", rather than remembering the full host name.</p>
+
+<p>
+If your home computer is a Mac, you still need the VPN but you don't
+need PuTTY.  Instead open a Terminal on your Mac and issue a command similar
+to:
+</p><pre>  $ /usr/bin/ssh up<i>DDDDDD</i>@mn01.soc.uni.ds.port.ac.uk
+</pre>
+where <tt>up<i>DDDDDD</i></tt> is the account name defined below.<p></p>
+
+
+<h2>Account names and passwords</h2>
+
+<p>
+Your
+user name will be the same as your university account id, all in lower
+case.  So something like this:
+</p><pre>  up<i>DDDDDD</i>
+</pre>
+where all the <i>D</i>'s are digits.  Type this at the "login as:"
+prompt.   Your initial password will be given
+to you in the class.  <i>It is not the same as the password for your
+general university account.</i>  If you are unfamiliar with Linux ways,
+don't be put off by the fact that there is no echo as you type your password!
+Just go ahead and type the password followed by carriage return.<p></p>
+
+<p>
+If log in is successful, you should meet a prompt ended by a "$" sign, where
+you can start typing Linux commands, if you know any.
+</p>
+
+
+<h2>Changing your password</h2>
+
+<p>If you are already familar with Linux commands and the bash shell,
+you can skip much of the rest of this tutorial<!-- and go straight to the discussion of
+interacting with HDFS-->.  First, however, <i>everybody must change their
+password!</i></p>
+
+<p>
+At the command prompt (which ends with a dollar sign, $), type:
+</p><pre>  $ passwd
+</pre>
+It should be spelt exactly like that: "passwd".
+
+<p><i>Do not</i> type the $ above, that's just the conventiona I'll
+use throughout these tutorials for highlighting commands to be issued.
+If there isn't a $ at the start of one of my lines, it probably is
+<i>not</i> a command to be executed in the Linux shell!</p>
+
+<p>
+You will be prompted for you current password, then for the new password, which
+you will have to repeat.  <i>Please do not choose a weak password!</i>
+If the passwd command warns against using a particular password, exit the
+command and start again with a different password.
+</p>
+
+<p>
+The passwd command only directly changes the password on the head node.
+When everyone has updated their passwords, I will propagate the changes
+through to all the worker nodes.</p>
+
+<h2>Nodes of the Cluster</h2>
+
+<p>The slightly odd naming of the 9 nodes of the cluster is as follows:
+</p><pre>  mn01.soc
+  mn02.soc
+  mn03.soc
+  mn04.soc
+  wn01.soc
+  wn02.soc
+  wn03.soc
+  wn04.soc
+  wn05.soc
+<!--
+  wn06.soc
+  wn07.soc
+  wn08.soc
+  wn09.soc
+--></pre>
+Originally there was a plan for the first four nodes all to take on some
+"master" role, and for the remaining five to be "workers".  That
+is not the current usage, but for now the naming has stuck.<p></p>
+
+<p>
+When you first log in you will be on the "head node", mn01.soc.  You
+can't log in directly to any of the other nodes from the outside world (and
+in fact no nodes except the head node have Internet connections to the outside
+world).</p>
+
+<p>
+But you may find it interesting to "hop around" some of these nodes.  From your
+initial location on mn01.soc, you can for example log in to wn01.soc by:
+</p><pre>  $ ssh wn01.soc
+</pre>
+If you get some messages saying a host authenticity can't be established,
+and asking if you're sure you want to continue connecting, type "yes".  This
+is common the first time you log in to a host.  (It does have to be "yes" - just "y" won't do.)  Type your cluster password when prompted.<p></p>
+
+<p>
+If successful this will start a new command shell on wn01.soc
+in the same window.
+A changed command prompt will be the only immediately
+obvious evidence you have "moved".</p>
+
+<p>
+This command:
+</p><pre>  $ hostname
+</pre>
+returns the name of the current host.
+<p></p>
+
+<p>
+From this host you can successively "hop" to other hosts by issuing further
+ssh commands.
+</p>
+
+<p>
+Issue the command:
+</p><pre>  $ exit
+</pre>
+or as a shorthand just type CTRL-D, to shutdown the remote shell and
+"return" (immediately or eventually) to mn01.soc.<p></p>
+
+<h2>The Linux File System</h2>
+
+<p>
+Linux has a hierarchical file system consisting of ordinary files and
+directories, quite similar to Windows (in Linux the equivalent to a folder
+is called a directory).  Linux uses the forward slash, "/", instead of the
+backward slash, "\", to separate elements of path names.  And in Linux
+the <i>root directory</i> is called simply "/" (in Windows root directories
+go by names like "C:\").</p>
+
+<p>
+The ls command lists the contents of a directory.  To get your bearings
+try:
+</p><pre>  $ ls /
+</pre>
+The output will be a colour coded list of files and directories (mostly
+directories) that live in the root directory.<p></p>
+
+<p>
+One of the directories in "/" will be "home".  List this in turn:
+</p><pre>  $ ls /home
+</pre>
+Most of the entries you will see will be the "home directories" of the
+various users who currently have accounts on the system.  Another notable
+directory in the root directory is "/etc", which is the default location
+for storing initialization and configuration data in Linux (some of the
+kinds of things that are stored in the Registry on Windows).<p></p>
+
+<p>
+At any particular time, the terminal has one singled out directory called
+the current working directory or present working directory.  When you first
+log in to the system, the working directory is your home directory.
+To find your current working directory, issue this command:
+</p><pre>  $ pwd
+</pre>
+If you issue the ls command without any arguments:
+<pre>  $ ls
+</pre>
+it will list the contents of the current working directory.  If this is
+your home directory it is likely to be rather empty.  You may see a bit
+more if you try this version:
+<pre>  $ ls -a
+</pre>
+The -a option means "also display hidden files".  In Linux, hidden files
+are just files whose name begins with the dot charactor ".".<p></p>
+
+<p>
+To create a new directory, issue a command like:
+</p><pre>  $ mkdir mytestdir
+</pre>
+The ls command should now display this directory along with anything else.
+To <i>change your working directory</i> to the new directory use the cd
+command:
+<pre>  $ cd mytestdir
+</pre>
+If you now do "ls" again, it will show nothing, because mytestdir is empty.
+To create a text file in this directory you may use the nano editor, for
+example:
+<pre>  $ nano myfile.txt
+</pre>
+Type some text.  Use the arrow keys to move the cursor around your text area
+if you want to change it (in this kind of editor you can't use the mouse to
+move the cursor).  When you have done enough in nano, hit the CTRL-X key.
+You will be asked if you want to save the modified buffer - usual answer
+"y".  If you are happy with the name of file the changes are to be written
+to, just hit return to leave nano.<p></p>
+
+<p>
+ls should now show your new file.  To view its contents (without editting)
+you can use the "cat" command, e.g.:
+</p><pre>  $ cat myfile.txt
+</pre>
+If it is a longer text file you want to display, try instead the "more"
+command, which outputs contents in screen size chunks, e.g.:
+<pre>  $ more longfile.txt
+</pre>
+At the end of each screen type the space bar to go to the next screen, or
+"q" to abandon viewing the file.<p></p>
+
+<h2>Ownerships and Permissions on files</h2>
+
+<p>
+Working in the directory where you just created a new text file, issue
+the "long listing" command:
+</p><pre>  $ ls -l
+</pre>
+Here is some output I got from that command:
+<pre>  total 4
+  -rw-r--r-- 1 dbc hdfs 37 Jan 31 09:58 myfile.txt
+</pre>
+Some of the information in the long listing is self explanatory.  The
+date and time "Jan 31 09:58" is the time the file was created.  The number
+"37" is the length of the file in bytes.<p></p>
+
+<p>
+The string "dbc" is my account ID (it's actually my initials).  You should
+see your "up" ID here.  "hdfs" is actually a Linux group, which isn't
+very relevant to us for the moment.  But what is this string at the beginning:
+</p><pre>  -rw-r--r--
+</pre>
+?<p></p>
+
+<p>
+In general this sequence of 10 characters is the "permissions" on the file.
+A hyphen here is generally a missing permission, as we will see below.  But the
+very first hyphen here actually gives us information on the file type.
+For an ordinary file like "myfile.txt" it will have this field has the
+value "-".  For a directory it has the value "d".</p>
+
+<p>
+The following 9 characters represent access permissions to the file for
+various users of the system.  The first sequence of 3:
+</p><pre>  rw-
+</pre>
+are the permissions for the owner of the file (me).  I am allowed to read
+or write the file.  If I was also allowed to execute the file, the third
+character would be "x" rather than "-".  But this is not an executable file
+so even as owner I am not allowed to execute it.<p>
+
+</p><p>
+The next sequence of three permissions:
+</p><pre>  r--
+</pre>
+are the access permissions of users in the ownership group "hdfs".  I
+don't want to discuss these groups in detail here, but suffice to say
+that users in this group can read the file, but not write it or execute
+it.<p></p>
+
+<p>
+The last sequence of three looks the same, but this refers to <i>all
+other users on the system</i>.  Again they can read the file but not
+write or execute it.</p>
+
+<p>
+As owner of the file, I can change the permissions on the file.  For example
+I might decided that I don't want ordinary users to be able to read my file
+so I would remove "r" in the "all other users" section.  Or I might change
+my file into an executable script file in some language, in which case I
+may add "x" for the owner of the file.</p>
+
+</a><p><a>
+To change permissions on files and directories you use the "chmod" command.
+There are a lot of possible options on this command, so I will refer you
+to </a><a href="https://ryanstutorials.net/linuxtutorial/permissions.php">this
+online tutorial</a> for more details.</p>
+
+<h2>Short Cuts - avoiding typing</h2>
+
+<p>
+One important short cut to know is "file name completion".  When typing a
+command that depends on one or more file name, you can usually type just the
+first few characters of the name, then hit the TAB character.  If there is
+an unambiguous completion for the name, the shell completes the name for
+you.  This avoids a lot of typing, and a lot of spelling mistakes.</p>
+
+<p>
+To repeat the previous command, use the up arrow.  This displays the last
+command, and you just have to hit return to run it again.  You can scroll
+up through multiple recent commands by repeating the up arrow, and use
+the left and right arrow keys to edit and tweak the selected previous
+command, before hitting return to execute it.</p>
+
+<p>
+Occasionally it is quicker to use "history substitution" - I'll give
+the two most useful examples of that:
+</p><ul>
+<li>The character sequence "!!" represents the last command executed.  You can just type:
+<pre>  $ !!
+</pre>
+and hit return and that repeats the last command.  This isn't a great gain over
+using "up arrow", but you can also add extra text at the beginning or end
+of the command, e.g.:
+<pre>  $ sudo !!
+</pre>
+That repeats the previous command with "sudo" prepended in front of it. (What is
+sudo?  You will have to go and look it up.  For the record you probably won't have sudo privileges on the cluster!)
+</li>
+<li>
+The character sequence "!$" represents <i>just the last argument</i> of the last
+command executed.  Here is an example of how you might use that:
+<pre>  $ ls -l myfile.txt
+  $ cat !$
+</pre>
+Here, after looking at the properties of the file "myfile.txt", you decide
+you want
+to look at its contents.  In the second command you use the the shorthand "!$"
+to avoid retyping the file name.
+</li>
+</ul>
+<p></p>
+
+<p>
+Finally, not really a short cut, but a vital key sequence to know: if a 
+command or program is running at the terminal, and it isn't doing what you
+want it to do, you can <i>kill</i> that command by typing CTRL-C.</p>
+
+<h2>Pipes and Redirection</h2>
+
+<p>
+We have seen examples of commands that write to and read from named files.
+All running processes (including all commands you execute) also have a
+<i>standard input</i> and a <i>standard output</i> that they can read from
+or write to, if they need to.  When the command is executed in the ordinary
+way from the terminal, the standard input defaults to the keyboard and
+the standard output defaults to the screen.</p>
+
+<p>
+The cat command is an example of a command that by default sends its
+output to standard output, which is typically the screen.  Very often
+you can omit input file name arguments from commands and they will take
+there input from standard input, e.g. the keyboard.  For example try this:
+</p><pre>  $ cat
+</pre>
+Initially this sits there doing nothing.  But now type some lines of
+text and you will see them echoed as cat reads from its standard input
+and writes what it reaceives to its standard output.  (You can type
+CTRL-C to end this command.)<p></p>
+
+<p>
+As a general feature, the shell lets you redirect the standard output ("screen output") of any command or program to a file.  The general sequence is:
+</p><pre>  $ <i>some-command</i> &gt; <i>new-file-name</i>
+</pre>
+where you choose the "new-file-name" (if it is an existing file it will
+be overwritten).  The output file may be a text file, but that depends on
+what the program is generating.  The general syntax is you follow the
+command (which might be a very complicated command in general) by a chevron,
+"&gt;", followed by the target file name.<p></p>
+
+<p>
+Likewise you can arrange for any program that is reading from the
+standard input stream (the keyboard typically) to take that input from a file
+instead by syntax like this: 
+</p><pre>  $ <i>some-command</i> &lt; input-lines.txt
+</pre>
+where in my example the input is now coming from a file called
+"input-lines.txt" instead of the keyboard.<p></p>
+
+<p>
+An even more powerful facility is "piping" the (standard) output of one
+command to the standard input of another command.  Here the syntax is
+like this:
+</p><pre>  $ <i>source-command</i> | <i>destination-command</i>
+</pre>
+The crucial thing here is the pipe symbol, or vertical bar, "|", joining the
+two commands.
+<p></p>
+
+<p>
+Although you can do lots of creative things with pipes, the single most
+common use is probably applying the "more" filter after a command that
+produces a lot of output.</p>
+
+<p>
+For example, if you type this command:
+</p><pre>  $ ls -R /etc
+</pre>
+it will recursively list all the contents of the system configuration directory
+/etc.  This produces a lot of output, and most of it just scrolls past.<p></p>
+
+<p>
+If the more command mentioned earlier is executed with no file name argument,
+it takes it's input from standard in.  So this pipeline:
+</p><pre>  $ ls -R /etc | more
+</pre>
+will scroll through the contents of the configuration directory in manageable
+screen sized chunks (recall you type the space bar the end of each screen to go to the next screen, or "q" to abandon viewing the data).<p></p>
+
+<h2>Getting Data to the Cluster</h2>
+
+<p>Often when you are working on a PC, say, you will find a data set on the Web
+somewhere, and download through the browser, then you can work on the
+downloaded file in situ on your computer.</p>
+
+<p>In terms of getting data onto the cluster, the problem is we can't
+actually run a browser <i>on</i>
+the cluster, not even on the head node.  Your only access is through a
+Linux terminal.  So how do we download (or upload) data to the cluster?
+</p>
+
+<p>If your data is somewhere on the Web, you might be able to find a
+direct URL to the data file by browsing on your client computer.  You
+then may be able to download that data file directly to the cluster
+by running a command like this:
+</p><pre>  $ /usr/bin/curl <i>URL</i>
+</pre>
+on mn01.soc.  Here <i>URL</i> is the URL for the data you found earlier.<p></p>
+
+<p>
+If for some reason that approach isn't applicable, or you already have your
+data files on your client computer, you will have to use an <i>scp client</i>
+to transfer the file(s) to the cluster.</p>
+
+<p>
+The most popular of these for Windows is probably WinSCP, which is available
+through AppsAnywhere or is free to download.  We give brief instructions
+below for using WinSCP to upload data to the cluster.</p>
+
+<h3>Using WinSCP</h3>
+
+<p>
+On one of the lab PCs (or your home machine, with VPN running), start
+WinSCP.
+</p>
+
+<p>
+Change the File Protocol to "SCP" - "SFTP" is <i>not</i> supported by our cluster.</p>
+
+Set the Host name to:
+<pre>    mn01.soc.uni.ds.port.ac.uk
+</pre>
+as we did above with PuTTY (leave the port as 22).<p></p>
+
+<p>
+Enter your user name and password for the cluster, as discussed earlier.</p>
+
+<p>
+Save all this session information if you wish, or just immediately click
+on Login.</p>
+
+<p>
+If login is successful, directory browsers for your files on the PC and
+for your home directory on the cluster will appear side by side, and
+you can for example drag and drop files between the two.</p>
+
+</div>
+
+<div id="footer">
+Copyright © University of Portsmouth, 2020
+</div>
+
+
+
+</div><div id="naptha_container0932014_0707"></div></body><grammarly-desktop-integration data-grammarly-shadow-root="true"><template shadowrootmode="open"><style>
+  div.grammarly-desktop-integration {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+    -moz-user-select: none;
+    -webkit-user-select: none;
+    -ms-user-select:none;
+    user-select:none;
+  }
+
+  div.grammarly-desktop-integration:before {
+    content: attr(data-content);
+  }
+</style><div aria-label="grammarly-integration" role="group" tabindex="-1" class="grammarly-desktop-integration" data-content="{&quot;mode&quot;:&quot;full&quot;,&quot;isActive&quot;:true,&quot;isUserDisabled&quot;:false}"></div></template></grammarly-desktop-integration><span style="--colorFg:#dae1ec; --colorFgFadedMore:#c3c9d3; --colorBg:#080a16; --colorBgDark:#000010; --colorBgLighter:#1d1f28; --colorBorder:#30323c;"><template shadowrootmode="closed"><style>
+:host {
+  position: absolute;
+  top: 0px;
+  left: 0px;
+  width: 0;
+}
+.vivaldi-translate-text-container {
+  display: block;
+  position: relative;
+  font-family: 'Roboto',arial,sans-serif;
+  font-size: 14px;
+  min-height: 150px;
+  min-width: 250px;
+  max-width: 1000px;
+  background-color: var(--colorBgLighter);
+  color: var(--colorFg);
+  box-shadow: 0px 0px 5px 2px rgba(0, 0, 0, 0.2);
+  border-width: 1px;
+  border-style: solid;
+  border-image: initial;
+  border-color: rgb(187, 187, 187) rgb(187, 187, 187) rgb(168, 168, 168);
+  border-radius: 6px;
+  margin: 0;
+  padding: 0;
+  z-index: 2147483647;
+}
+.vivaldi-translate-text-container.initial {
+  display: none;
+  height: 0;
+}
+.vivaldi-translate-text-close {
+  position: relative;
+  cursor: pointer;
+  background-color: var(--colorBgLighter);
+  border: 0;
+  left: calc(100% - 20px);
+  top: 5px;
+  margin: 0;
+  padding: 0;
+  width: 16px;
+  height: 16px;
+}
+.vivaldi-translate-text-close > svg {
+  fill: var(--colorFg);
+}
+.vivaldi-translate-text-close:hover {
+  background-color: var(--colorBg);
+}
+.vivaldi-translate-text,
+.vivaldi-translate-text-result {
+  position: relative;
+  cursor: text;
+  -webkit-appearance: none;
+  top: 0px;
+  left: 0px;
+  overflow-y: auto;
+  margin-right: 10px;
+  margin-bottom: 16px;
+  padding: 6px;
+  border-width: 0px;
+  height: 100%;
+  transition: opacity 0.3s;
+  outline: unset;
+  color: var(--colorFgFadedMore);
+}
+.vivaldi-translate-text-result {
+  color: var(--colorFg);
+}
+.vivaldi-translate-text-result-container {
+  margin: 0;
+  padding: 0;
+  padding-top: 12px;
+  background-color: var(--colorBg);
+  border-width: 1px 0 1px 0;
+  border-style: solid;
+  border-image: initial;
+  border-color: var(--colorBorder);
+}
+.vivaldi-translate-select-languages {
+  width: 200px;
+  font-family: 'Roboto',arial,sans-serif;
+  font-size: 12px;
+  margin-left: 6px;
+  background-color: var(--colorBgLighter);
+  color: var(--colorFg);
+}
+.vivaldi-translate-src-language,
+.vivaldi-translate-dest-language {
+  padding-left: 6px;
+  font-weight: 600;
+  font-size: 10px;
+}
+.vivaldi-translate-language {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+.vivaldi-translate-timing {
+  font-size: 8px;
+  text-align: right;
+  margin-right: 6px;
+  margin-bottom: 6px;
+  padding: 0 6px;
+}
+.vivaldi-translate-footer {
+  font-size: 10px;
+  padding: 4px;
+  background-color: var(--colorBgDark);
+  margin: 0;
+  border-bottom-right-radius: 6px;
+  border-bottom-left-radius: 6px;
+}
+.vivaldi-translate-button-container {
+  display: block;
+  position: relative;
+  cursor: pointer;
+  overflow: hidden;
+  box-shadow: 0px 0px 5px 2px rgba(0, 0, 0, 0.2);
+  border-radius: 2px;
+  z-index: 2147483647;
+  width: 32px;
+  height: 32px;
+}
+.vivaldi-translate-button-container.initial {
+  display: none;
+  height: 0;
+}
+.vivaldi-translate-button {
+  position: relative;
+  -webkit-appearance: none;
+  background-color: var(--colorBg);
+  top: 0px;
+  left: 0px;
+  width: 32px;
+  height: 32px;
+  margin-left: 0px;
+  margin-top: 0px;
+  padding: 6px;
+  border-width: 1px;
+  transition: opacity 0.3s;
+  cursor: pointer;
+  outline: solid rgb(200, 200, 200);
+}
+.vivaldi-translate-button > svg {
+  fill: var(--colorFg);
+}
+.vivaldi-translate-button:hover {
+  background-color: var(--colorBgLighter);
+}
+</style><div class="vivaldi-translate-button-container initial" style="left: -20px; top: 20px;"><button class="vivaldi-translate-button"><svg width="16" height="16" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <path fill-rule="evenodd" clip-rule="evenodd" d="M13.848 3.349v.99H12.63c-.457 1.264-1.074 2.297-1.852 3.15.871.675 1.937 1.18 3.222 1.47-.245.247-.567.725-.719 1.015-1.361-.35-2.46-.922-3.349-1.682C9.5 9 9 9.5 8 10l-.638-.969C8.053 8.708 9 8 9.162 7.533c-.76-.88-1.344-1.947-1.8-3.194h-1.21v-.99h3.315V2h1.024v1.349h3.357zM9.992 6.773c.608-.666 1.09-1.469 1.454-2.434H8.478c.363.922.862 1.742 1.514 2.434z"></path>
+  <path d="M5.846 11.558H3.15L2.636 13H1l2.78-7h1.425L8 13H6.364l-.518-1.442zm-2.282-1.169h1.867l-.939-2.62-.928 2.62z"></path>
+</svg></button></div></template></span></html>
