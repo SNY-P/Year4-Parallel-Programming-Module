@@ -4,7 +4,7 @@ This repo contains the work that has been done for my 4th year parallel programm
 
 ## Week 1 - Week 4
 Work done between Weeks 1 to 4 are done in java.
-- [Week 1](Resource Files/Lab Worksheets/week1-lab.html): An introduction and refresher on using Java threads to speed up simple calculations using parallelism.
+- [Week 1](week1-lab.html): An introduction and refresher on using Java threads to speed up simple calculations using parallelism.
 - [Week 2]("Resource Files/Lab Worksheets/week2-lab.html"): Execution of the calculation of the Mandelbrot set using multiple threads on multicore processor.
 - [Week 3]("Resource Files\Lab Worksheets\week3-lab.html"): Continuation of the Mandelbrot Set work from Week 2 & introduction to Conway's Game of Life.
 - [Week 4]("Resource Files\Lab Worksheets\week4-lab.html"): Introduction to barrier synchronisation across java threads.
